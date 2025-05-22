@@ -1,59 +1,122 @@
-# Precipitation Data Conversion
+# County Climate Analysis
 
-## Converting Precipitation Flux (pr) to Millimeters (mm)
+A Python-based toolkit for analyzing climate data at the county level across U.S. territories. This project processes daily temperature and precipitation data to calculate climate statistics and visualize trends at the county level.
 
-Climate model outputs often provide precipitation as a flux in units of `kg m⁻² s⁻¹` (kilograms per square meter per second). To convert this to millimeters (mm) of precipitation over a given time period, use the following method:
+## Features
 
-### Why This Works
-- 1 kg of water over 1 m² is equivalent to a 1 mm layer of water (since 1 liter = 1 kg = 1 mm over 1 m²).
-- The `s⁻¹` (per second) means the value is a rate, so you need to multiply by the number of seconds in your desired time period.
+- Processes daily climate data (temperature and precipitation) from NetCDF files
+- Calculates county-level climate statistics including:
+  - Annual mean temperature
+  - Days above 90°F (32.22°C)
+  - Days below 32°F (0°C)
+  - Total annual precipitation
+  - Days with precipitation > 1 inch (25.4mm)
+- Supports multiple U.S. regions:
+  - Contiguous United States (CONUS)
+  - Alaska (AK)
+  - Hawaii and Islands (HI)
+  - Puerto Rico and U.S. Virgin Islands (PRVI)
+  - Guam and Northern Mariana Islands (GU)
+- Handles multiple climate scenarios (historical and SSP projections)
+- Parallel processing support using Dask for efficient computation
 
-### Formula
-For daily precipitation:
+## Workflow
 
-```
-pr (mm/day) = pr (kg m⁻² s⁻¹) × 86400
-```
-
-Where 86400 is the number of seconds in a day (24 × 60 × 60).
-
-### Example
-If the model output is `0.0001 kg m⁻² s⁻¹`, then:
-
-```
-0.0001 × 86400 = 8.64 mm/day
-```
-
-This is the standard approach used in climate science (see CMIP/ERA5/ECMWF documentation). 
-
----
-
-# Temperature Conversion
-
-## Kelvin to Celsius
-
-To convert temperature from Kelvin (K) to Celsius (°C):
-
-```
-T(°C) = T(K) - 273.15
+```mermaid
+graph TD
+    A[NetCDF Climate Data] --> B[climate_means.py]
+    B --> C[Regional Climate Averages]
+    D[County Boundaries] --> G[county_climate_stats.py]
+    C --> G
+    G --> H[County Statistics]
+    H --> I[CSV Reports]
+    H --> J[GeoPackage Files]
+    B --> K[validate_climate_means.py]
+    G --> L[validate_all_regions.py]
 ```
 
-**Example:**
-If the model output is `295.15 K`, then:
-```
-295.15 - 273.15 = 22 °C
+## Setup
+
+1. Clone the repository:
+```bash
+git clone https://github.com/mihiarc/countyclim.git
+cd countyclim
 ```
 
-## Kelvin to Fahrenheit
-
-To convert temperature from Kelvin (K) to Fahrenheit (°F):
-
-```
-T(°F) = (T(K) - 273.15) × 9/5 + 32
+2. Create and activate a virtual environment:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-**Example:**
-If the model output is `295.15 K`, then:
+3. Install dependencies using uv:
+```bash
+pip install uv
+uv pip install -r requirements.txt
 ```
-(295.15 - 273.15) × 9/5 + 32 = 71.6 °F
-``` 
+
+## Data Structure
+
+- `/data/`
+  - `/hurs/` - Relative humidity data
+  - `/pr/` - Precipitation data
+  - `/tas/` - Average temperature data
+  - `/tasmax/` - Maximum temperature data
+  - `/tasmin/` - Minimum temperature data
+  - `/tl_2024_us_county/` - County boundary data
+
+- `/output/`
+  - `/climate_means/` - Processed regional climate averages
+  - `/county_boundaries/` - Processed county boundary files
+  - `/county_climate_stats/` - County-level climate statistics
+  - `/figures/` - Output visualizations
+
+## Usage
+
+1. Process climate means for all regions:
+```bash
+python climate_means.py
+```
+
+2. Calculate county-level climate statistics:
+```bash
+python county_climate_stats.py
+```
+
+3. Validate results:
+```bash
+python validate_climate_means.py
+python validate_all_regions.py
+```
+
+## Technical Details
+
+- Uses Dask for distributed computing with configurable workers and memory limits
+- Supports chunked processing of large NetCDF files
+- Implements efficient zonal statistics calculation
+- Handles coordinate system conversions (0-360° to -180-180°)
+- Includes comprehensive data validation and error handling
+- Generates both spatial (GeoPackage) and tabular (CSV) outputs
+
+## Output Files
+
+- `county_climate_stats.csv`: Tabular data with climate statistics for each county
+- `county_climate_stats.gpkg`: Spatial data with county geometries and climate statistics
+- Daily statistics stored in parquet format for each climate variable
+- Validation reports and figures in the output directory
+
+## Dependencies
+
+Key dependencies include:
+- xarray for NetCDF data processing
+- geopandas for spatial data handling
+- dask for parallel processing
+- rasterstats for zonal statistics
+- cartopy for map projections
+- regionmask for region definitions
+
+## Notes
+
+- Large data files in `/data/` and processed outputs in `/output/` are not tracked in git
+- Processing requires significant memory (recommended: 64GB+)
+- Parallel processing is configurable through environment variables 
