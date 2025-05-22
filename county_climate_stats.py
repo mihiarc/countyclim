@@ -123,14 +123,36 @@ def compute_daily_zonal_stats(climate_data, counties, variable, stat_type, outpu
     logger.info(f"Computing daily zonal statistics for {variable}")
     
     var_data = climate_data[variable]
+    
+    # Check if we need to convert precipitation units
+    if variable.startswith('pr') and 'units' in var_data.attrs:
+        current_units = var_data.attrs['units']
+        logger.info(f"Precipitation data units: {current_units}")
+        if current_units == 'kg m-2 s-1':
+            logger.info("Converting precipitation from kg/m²/s to mm/day")
+            var_data = var_data * 86400
+            var_data.attrs['units'] = 'mm/day'
+        elif current_units != 'mm/day':
+            logger.warning(f"Unexpected precipitation units: {current_units}")
+    
     lon_values = var_data.lon.values
     lat_values = var_data.lat.values
     
+    # Calculate grid cell size
+    if len(lon_values) > 1:
+        dx = lon_values[1] - lon_values[0]
+    else:
+        dx = 1.0  # Default to 1 degree for single cell
+    if len(lat_values) > 1:
+        dy = lat_values[1] - lat_values[0]
+    else:
+        dy = 1.0  # Default to 1 degree for single cell
+    
     transform = rasterio.transform.from_bounds(
-        np.min(lon_values), 
-        np.min(lat_values), 
-        np.max(lon_values), 
-        np.max(lat_values), 
+        np.min(lon_values) - dx/2, 
+        np.min(lat_values) - dy/2, 
+        np.max(lon_values) + dx/2, 
+        np.max(lat_values) + dy/2, 
         len(lon_values), 
         len(lat_values)
     )
@@ -158,7 +180,8 @@ def compute_daily_zonal_stats(climate_data, counties, variable, stat_type, outpu
             ) as dst:
                 dst.write(data_to_write, 1)
             
-            if stat_type == 'threshold':
+            # For precipitation, use mean value within each county to avoid bias from county size
+            if variable.startswith('pr'):
                 stats = zonal_stats(counties, temp_raster, stats=['mean'])
                 daily_values = [s['mean'] for s in stats]
             else:

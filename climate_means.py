@@ -372,6 +372,24 @@ def process_period_region(period_info, variable_name, file_pattern, region_key):
     climate_avg = climate_avg.swap_dims({'dayofyear': 'time'})
     print(f"Final dimensions: {climate_avg.dims}")
     
+    # Preserve original attributes
+    if hasattr(stacked_data, 'attrs'):
+        climate_avg.attrs.update(stacked_data.attrs)
+    
+    # Apply unit conversions
+    if variable_name.startswith('tas'):
+        # Convert from Kelvin to Celsius
+        climate_avg = climate_avg - 273.15
+        climate_avg.attrs['units'] = 'degC'
+        climate_avg.attrs['long_name'] = 'daily temperature'
+        climate_avg.attrs['description'] = 'Daily temperature converted from K to °C'
+    elif variable_name.startswith('pr'):
+        # Convert from kg m^-2 s^-1 to mm/day
+        climate_avg = climate_avg * 86400
+        climate_avg.attrs['units'] = 'mm/day'
+        climate_avg.attrs['long_name'] = 'daily precipitation'
+        climate_avg.attrs['description'] = 'Daily precipitation converted from kg/m²/s to mm/day'
+    
     return climate_avg
 
 def convert_longitudes_to_standard(ds):
@@ -438,16 +456,6 @@ def main():
                     climate_avg = process_period_region(period, var_name, file_pattern, region_key)
                     
                     if climate_avg is not None:
-                        # --- UNIT CONVERSIONS ---
-                        if var_name in ['tas', 'tasmax', 'tasmin']:
-                            # Convert from Kelvin to Celsius - maintain lazy evaluation
-                            climate_avg = climate_avg - 273.15
-                            climate_avg.attrs['units'] = 'degC'
-                        elif var_name == 'pr':
-                            # Convert from kg m^-2 s^-1 to mm/day - maintain lazy evaluation
-                            climate_avg = climate_avg * 86400
-                            climate_avg.attrs['units'] = 'mm/day'
-                        # ------------------------
                         # Initialize dataset for this region if it doesn't exist
                         if region_key not in region_datasets:
                             region_datasets[region_key] = xr.Dataset()
