@@ -161,10 +161,10 @@ def compute_daily_zonal_stats(climate_data, counties, variable, stat_type, outpu
     temp_dir = os.path.join(output_dir, 'temp_rasters')
     os.makedirs(temp_dir, exist_ok=True)
     
-    def process_single_day(i, date, data_array):
+    def process_day(data_array, day_idx):
         """Process a single day of data."""
-        data_to_write = np.flipud(data_array)
-        temp_raster = os.path.join(temp_dir, f"{variable}_temp_{i}.tif")
+        data_to_write = np.flipud(data_array.values)
+        temp_raster = os.path.join(temp_dir, f"{variable}_temp_{day_idx}.tif")
         
         try:
             with rasterio.open(
@@ -188,7 +188,7 @@ def compute_daily_zonal_stats(climate_data, counties, variable, stat_type, outpu
                 stats = zonal_stats(counties, temp_raster, stats=[stat_type])
                 daily_values = [s[stat_type] for s in stats]
             
-            return pd.Timestamp(date), daily_values
+            return daily_values
             
         finally:
             if os.path.exists(temp_raster):
@@ -200,56 +200,28 @@ def compute_daily_zonal_stats(climate_data, counties, variable, stat_type, outpu
         total_days = len(dates)
         logger.info(f"Processing {total_days} days")
         
-        # Process in smaller batches to control memory usage
-        batch_size = 10  # Reduced batch size
-        max_parallel_batches = 3  # Control how many batches are in memory at once
-        daily_results = {}
+        # Process data in chunks
+        chunk_size = 20  # Process 20 days at a time
+        results = []
         
-        # Process batches in groups to control memory usage
-        for group_start in range(0, total_days, batch_size * max_parallel_batches):
-            group_end = min(group_start + batch_size * max_parallel_batches, total_days)
-            logger.info(f"Processing group {group_start//batch_size + 1} to {group_end//batch_size} of {(total_days + batch_size - 1)//batch_size} batches")
+        for chunk_start in range(0, total_days, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, total_days)
+            logger.info(f"Processing chunk {chunk_start//chunk_size + 1} of {(total_days + chunk_size - 1)//chunk_size}")
             
-            # Process one group of batches at a time
-            futures = []
+            # Get chunk data
+            chunk_data = var_data.isel(time=slice(chunk_start, chunk_end))
+            chunk_data = chunk_data.compute()  # Load chunk into memory
             
-            # Create futures for this group
-            for batch_start in range(group_start, group_end, batch_size):
-                batch_end = min(batch_start + batch_size, total_days)
-                
-                # Load the batch data
-                batch_slice = slice(batch_start, batch_end)
-                batch_data = var_data.isel(time=batch_slice)
-                
-                # Create futures for each day in the batch
-                for i in range(batch_end - batch_start):
-                    abs_idx = batch_start + i
-                    # Create a delayed object for loading and processing this day's data
-                    day_data = dask.delayed(batch_data.isel(time=i).values)
-                    future = dask.delayed(process_single_day)(
-                        abs_idx,
-                        dates[abs_idx],
-                        day_data
-                    )
-                    futures.append(future)
-            
-            # Compute this group's futures
-            logger.info(f"Computing results for days {group_start} to {group_end}")
-            batch_results = dask.compute(*futures)
-            
-            # Process results for this group
-            for date, values in batch_results:
-                daily_results[date] = values
-            
-            # Clear the futures list to free memory
-            futures.clear()
-            
-            # Force garbage collection after each group
-            import gc
-            gc.collect()
+            # Process each day in the chunk
+            for i in range(chunk_end - chunk_start):
+                abs_idx = chunk_start + i
+                if abs_idx < total_days:  # Guard against out-of-bounds
+                    day_data = chunk_data.isel(time=i)
+                    daily_values = process_day(day_data, abs_idx)
+                    results.append((pd.Timestamp(dates[abs_idx]), daily_values))
         
         # Convert results to DataFrame
-        df = pd.DataFrame(daily_results, index=counties.id_numeric)
+        df = pd.DataFrame({date: values for date, values in results}, index=counties.id_numeric)
         df.index.name = 'id_numeric'
         
         return df
