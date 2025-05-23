@@ -111,6 +111,24 @@ class ClimateConfig:
                                      yaml_config.get('memory_limit', 
                                                    f'{int(psutil.virtual_memory().total / (1024**3))}GB'))
         
+        # Enhanced Dask configuration
+        yaml_dask_config = yaml_config.get('dask_config', {})
+        self.dask_config = {
+            'chunk_size': yaml_dask_config.get('chunk_size', {'time': 365, 'spatial': 'auto'}),
+            'memory_target': float(yaml_dask_config.get('memory_target', 0.8)),
+            'memory_spill': float(yaml_dask_config.get('memory_spill', 0.9)),
+            'memory_pause': float(yaml_dask_config.get('memory_pause', 0.95)),
+            'memory_terminate': float(yaml_dask_config.get('memory_terminate', 0.98)),
+            'threads_per_worker': int(yaml_dask_config.get('threads_per_worker', 2)),
+            'processes': yaml_dask_config.get('processes', True),
+            'work_stealing': yaml_dask_config.get('work_stealing', True),
+            'connect_timeout': yaml_dask_config.get('connect_timeout', '60s'),
+            'tcp_timeout': yaml_dask_config.get('tcp_timeout', '60s'),
+            'allowed_failures': int(yaml_dask_config.get('allowed_failures', 3)),
+            'dashboard_port': int(yaml_dask_config.get('dashboard_port', 8787)),
+            'silence_logs': yaml_dask_config.get('silence_logs', False)
+        }
+        
         # Active scenario
         self.active_scenario = os.getenv('CLIMATE_ACTIVE_SCENARIO', 
                                        yaml_config.get('active_scenario', 'historical'))
@@ -234,6 +252,7 @@ class ClimateConfig:
             'max_processes': self.max_processes,
             'memory_limit': self.memory_limit,
             'chunk_size': self.chunk_size,
+            'dask_config': self.dask_config,
             'data_availability': self.data_availability
         }
         
@@ -256,6 +275,7 @@ class ClimateConfig:
             'active_variables': self.active_variables,
             'active_regions': self.active_regions,
             'scenarios': self.scenarios,
+            'dask_config': self.dask_config,
             'data_availability': self.data_availability
         }
     

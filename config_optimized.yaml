@@ -1,0 +1,45 @@
+active_regions:
+- CONUS
+- AK
+active_scenario: historical
+active_variables:
+- pr
+base_data_path: data/NorESM2-LM
+chunk_size:
+  time: 365
+dask_config:
+  allowed_failures: 3
+  chunk_size:
+    spatial: auto
+    time: 365
+  connect_timeout: 60s
+  dashboard_port: 8787
+  memory_pause: 0.95
+  memory_spill: 0.9
+  memory_target: 0.8
+  memory_terminate: 0.98
+  processes: true
+  silence_logs: false
+  tcp_timeout: 60s
+  threads_per_worker: 2
+  work_stealing: true
+data_availability:
+  historical:
+    end: 2014
+    start: 1950
+  ssp126:
+    end: 2100
+    start: 2015
+  ssp245:
+    end: 2100
+    start: 2015
+  ssp370:
+    end: 2100
+    start: 2015
+  ssp585:
+    end: 2100
+    start: 2015
+max_processes: 4
+memory_limit: 3.2GB
+output_dir: output/climate_means
+parallel_processing: true

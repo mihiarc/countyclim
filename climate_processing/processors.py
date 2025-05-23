@@ -12,6 +12,8 @@ from typing import Dict, List, Optional, Tuple
 import xarray as xr
 import numpy as np
 from dask.distributed import Client, LocalCluster
+import psutil
+import dask
 
 from .config import ClimateConfig
 from .regions import RegionManager, Region
@@ -41,14 +43,54 @@ class ClimateProcessor:
         self.cluster = None
     
     def setup_dask(self) -> None:
-        """Initialize Dask distributed computing cluster."""
+        """Initialize Dask distributed computing cluster with optimized settings."""
         print(f"Initializing Dask cluster with {self.config.max_processes} workers")
+        
+        # Calculate optimal memory per worker
+        total_memory_gb = psutil.virtual_memory().total / (1024**3)
+        memory_per_worker = min(
+            float(self.config.memory_limit.replace('GB', '')),
+            (total_memory_gb * 0.8) / self.config.max_processes  # Use 80% of total memory
+        )
+        
+        # Get Dask configuration from config
+        dask_cfg = self.config.dask_config
+        
+        # Configure Dask settings for climate data processing
+        dask.config.set({
+            'array.slicing.split_large_chunks': True,
+            'array.chunk-size': '128MB',
+            'distributed.worker.memory.target': dask_cfg['memory_target'],
+            'distributed.worker.memory.spill': dask_cfg['memory_spill'],
+            'distributed.worker.memory.pause': dask_cfg['memory_pause'],
+            'distributed.worker.memory.terminate': dask_cfg['memory_terminate'],
+            'distributed.comm.timeouts.connect': dask_cfg['connect_timeout'],
+            'distributed.comm.timeouts.tcp': dask_cfg['tcp_timeout'],
+            'distributed.scheduler.allowed-failures': dask_cfg['allowed_failures'],
+            'distributed.scheduler.work-stealing': dask_cfg['work_stealing'],
+        })
+        
         self.cluster = LocalCluster(
             n_workers=self.config.max_processes,
-            memory_limit=self.config.memory_limit
+            threads_per_worker=dask_cfg['threads_per_worker'],
+            memory_limit=f'{memory_per_worker:.1f}GB',
+            processes=dask_cfg['processes'],
+            dashboard_address=f":{dask_cfg['dashboard_port']}",
+            silence_logs=dask_cfg['silence_logs'],
+            local_directory='./dask-worker-space',  # Local scratch space
         )
         self.client = Client(self.cluster)
-        print(f"Dask dashboard available at: {self.client.dashboard_link}")
+        
+        print(f"Dask cluster initialized:")
+        print(f"  Workers: {self.config.max_processes}")
+        print(f"  Threads per worker: {dask_cfg['threads_per_worker']}")
+        print(f"  Memory per worker: {memory_per_worker:.1f}GB")
+        print(f"  Total cluster memory: {memory_per_worker * self.config.max_processes:.1f}GB")
+        print(f"  Dashboard: {self.client.dashboard_link}")
+        print(f"  Memory management: target={dask_cfg['memory_target']}, spill={dask_cfg['memory_spill']}")
+        
+        # Warm up the cluster
+        self.client.run(lambda: None)
     
     def cleanup_dask(self) -> None:
         """Clean up Dask cluster and client."""

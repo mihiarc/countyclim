@@ -2,8 +2,7 @@
 # Modify as needed for your environment
 
 # Data paths - using local data directory
-external_drive_path: data  # Local data directory in project
-base_data_path: ${external_drive_path}/NorESM2-LM  # Climate data subdirectory
+base_data_path: data/NorESM2-LM  # Climate data subdirectory
 
 # Output configuration
 output_dir: output/climate_means
@@ -11,29 +10,57 @@ output_dir: output/climate_means
 # Processing configuration
 active_scenario: historical  # Options: historical, ssp126, ssp245, ssp370, ssp585
 active_variables:  # Variables to process (leave empty or comment out to process all)
-  - tas      # Mean temperature
-  - tasmax   # Maximum temperature  
-  - tasmin   # Minimum temperature
+  # - tas      # Mean temperature
+  # - tasmax   # Maximum temperature  
+  # - tasmin   # Minimum temperature
   - pr       # Precipitation
   # To process only specific variables, comment out the ones you don't want:
   # - tas
   # - pr
 
 active_regions:  # Regions to process (leave empty or comment out to process all)
-  - CONUS    # Continental United States
+  # - CONUS    # Continental United States
   - AK       # Alaska
-  - HI       # Hawaii and Islands
-  - PRVI     # Puerto Rico and U.S. Virgin Islands
-  - GU       # Guam and Northern Mariana Islands
+  # - HI       # Hawaii and Islands
+  # - PRVI     # Puerto Rico and U.S. Virgin Islands
+  # - GU       # Guam and Northern Mariana Islands
   # To process only specific regions, comment out the ones you don't want:
   # - CONUS
   # - AK
 
+# Parallel processing configuration
 parallel_processing: true
-max_processes: 6  # Number of parallel workers
-memory_limit: 8GB  # Memory limit per worker
+max_processes: 4  # Reduced from 6 for better memory management (recommended: CPU cores / 2)
+memory_limit: 3GB  # Memory limit per worker (recommended: total RAM * 0.8 / max_processes)
 
-# Dask configuration
+# Dask configuration for climate data processing
+dask_config:
+  # Chunk configuration
+  chunk_size:
+    time: 365  # Process one year at a time
+    spatial: auto  # Let Dask determine optimal spatial chunking
+  
+  # Memory management
+  memory_target: 0.8    # Target memory usage (80%)
+  memory_spill: 0.9     # Spill to disk threshold (90%)
+  memory_pause: 0.95    # Pause computation threshold (95%)
+  memory_terminate: 0.98 # Terminate worker threshold (98%)
+  
+  # Performance tuning
+  threads_per_worker: 2  # Optimal for I/O bound operations
+  processes: true        # Use processes for memory isolation
+  work_stealing: true    # Enable work stealing for load balancing
+  
+  # Timeouts and reliability
+  connect_timeout: 60s
+  tcp_timeout: 60s
+  allowed_failures: 3
+  
+  # Dashboard and monitoring
+  dashboard_port: 8787
+  silence_logs: false
+
+# Legacy chunk_size for backward compatibility
 chunk_size:
   time: 365  # Process one year at a time
 
