@@ -14,20 +14,99 @@ from datetime import datetime
 import multiprocessing as mp
 import dask
 from dask.distributed import Client, LocalCluster
+import psutil
+import platform
 
 # Configuration - ADJUST THESE PATHS AND SETTINGS FOR YOUR ENVIRONMENT
 TEMP_FILE_PATTERN = 'data/tas/tas_day_*.nc'  # Updated file pattern
 PRECIP_FILE_PATTERN = 'data/pr/pr_day_*.nc'  # Updated file pattern
 OUTPUT_DIR = 'output/climate_means'  # Output directory
 PARALLEL_PROCESSING = True  # Set to False for serial processing
-MAX_PROCESSES = mp.cpu_count() - 1  # Number of processes to use
+MAX_PROCESSES = mp.cpu_count() - 2  # Number of processes to use
 
 # Dask configuration
 CHUNK_SIZE = {'time': 365}  # Chunk by one year of daily data
-MEMORY_LIMIT = '64GB'  # Adjust based on your system's available memory
+MEMORY_LIMIT = f'{int(psutil.virtual_memory().total / (1024**3))}GB'  # Set memory limit based on system RAM
+
+# External drive configuration - UPDATE THIS PATH TO YOUR EXTERNAL DRIVE
+EXTERNAL_DRIVE_PATH = '/Volumes/RPA1TB'  # Update this to your external drive mount point
+
+# Base data directory on external drive
+BASE_DATA_PATH = f'{EXTERNAL_DRIVE_PATH}/NorESM2-LM'
 
 # Create output directory if it doesn't exist
 os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def list_available_drives():
+    """List available drives to help identify the correct external drive path."""
+    system = platform.system()
+    print(f"\nDetected system: {system}")
+    
+    if system == "Darwin":  # macOS
+        volumes_path = "/Volumes"
+        if os.path.exists(volumes_path):
+            volumes = [d for d in os.listdir(volumes_path) if os.path.isdir(os.path.join(volumes_path, d))]
+            print(f"Available volumes in {volumes_path}:")
+            for vol in volumes:
+                print(f"  /Volumes/{vol}")
+    
+    elif system == "Windows":
+        import string
+        available_drives = ['%s:' % d for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
+        print("Available drives:")
+        for drive in available_drives:
+            print(f"  {drive}")
+    
+    elif system == "Linux":
+        media_paths = ["/media", "/mnt"]
+        for media_path in media_paths:
+            if os.path.exists(media_path):
+                try:
+                    mounts = os.listdir(media_path)
+                    if mounts:
+                        print(f"Available mounts in {media_path}:")
+                        for mount in mounts:
+                            full_path = os.path.join(media_path, mount)
+                            if os.path.isdir(full_path):
+                                print(f"  {full_path}")
+                except PermissionError:
+                    print(f"  Permission denied accessing {media_path}")
+
+# Validate external drive path
+def validate_external_drive():
+    """Validate that the external drive path exists and is accessible."""
+    if not os.path.exists(EXTERNAL_DRIVE_PATH):
+        print(f"ERROR: External drive path does not exist: {EXTERNAL_DRIVE_PATH}")
+        print("Please update EXTERNAL_DRIVE_PATH in the script to point to your external drive.")
+        print("Common paths:")
+        print("  macOS: /Volumes/YourDriveName")
+        print("  Windows: D: or E:")
+        print("  Linux: /media/username/drivename or /mnt/external")
+        
+        # List available drives to help user
+        list_available_drives()
+        return False
+    
+    if not os.path.exists(BASE_DATA_PATH):
+        print(f"WARNING: Base data path does not exist: {BASE_DATA_PATH}")
+        print("Please ensure your climate data is organized in the expected directory structure.")
+        print("Expected structure:")
+        print(f"  {BASE_DATA_PATH}/")
+        print("    ├── tas/")
+        print("    │   ├── historical/")
+        print("    │   ├── ssp126/")
+        print("    │   ├── ssp245/")
+        print("    │   ├── ssp370/")
+        print("    │   └── ssp585/")
+        print("    ├── tasmax/")
+        print("    ├── tasmin/")
+        print("    └── pr/")
+        print("  OR if data is in a different structure, update BASE_DATA_PATH accordingly.")
+        return False
+    
+    print(f"✓ External drive path validated: {EXTERNAL_DRIVE_PATH}")
+    print(f"✓ Base data path found: {BASE_DATA_PATH}")
+    return True
 
 # Define regional bounds (for 0-360 longitude system)
 REGION_BOUNDS = {
@@ -146,47 +225,120 @@ def get_region_crs_info(region_key):
 # Configuration - ADJUST THESE PATHS AND SETTINGS FOR YOUR ENVIRONMENT
 SCENARIOS = {
     'historical': {
-        'tas': 'data/tas/historical/tas_day_*.nc',
-        'tasmax': 'data/tasmax/historical/tasmax_day_*.nc',
-        'tasmin': 'data/tasmin/historical/tasmin_day_*.nc',
-        'pr': 'data/pr/historical/pr_day_*.nc'
+        'tas': f'{BASE_DATA_PATH}/tas/historical/tas_day_*.nc',
+        'tasmax': f'{BASE_DATA_PATH}/tasmax/historical/tasmax_day_*.nc',
+        'tasmin': f'{BASE_DATA_PATH}/tasmin/historical/tasmin_day_*.nc',
+        'pr': f'{BASE_DATA_PATH}/pr/historical/pr_day_*.nc'
     },
     'ssp126': { 
-        'tas': 'data/tas/ssp126/tas_day_*.nc',
-        'tasmax': 'data/tasmax/ssp126/tasmax_day_*.nc',
-        'tasmin': 'data/tasmin/ssp126/tasmin_day_*.nc',
-        'pr': 'data/pr/ssp126/pr_day_*.nc'
+        'tas': f'{BASE_DATA_PATH}/tas/ssp126/tas_day_*.nc',
+        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp126/tasmax_day_*.nc',
+        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp126/tasmin_day_*.nc',
+        'pr': f'{BASE_DATA_PATH}/pr/ssp126/pr_day_*.nc'
     },
     'ssp245': { 
-        'tas': 'data/tas/ssp245/tas_day_*.nc',
-        'tasmax': 'data/tasmax/ssp245/tasmax_day_*.nc',
-        'tasmin': 'data/tasmin/ssp245/tasmin_day_*.nc',
-        'pr': 'data/pr/ssp245/pr_day_*.nc'
+        'tas': f'{BASE_DATA_PATH}/tas/ssp245/tas_day_*.nc',
+        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp245/tasmax_day_*.nc',
+        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp245/tasmin_day_*.nc',
+        'pr': f'{BASE_DATA_PATH}/pr/ssp245/pr_day_*.nc'
     },
     'ssp370': { 
-        'tas': 'data/tas/ssp370/tas_day_*.nc',
-        'tasmax': 'data/tasmax/ssp370/tasmax_day_*.nc',
-        'tasmin': 'data/tasmin/ssp370/tasmin_day_*.nc',
-        'pr': 'data/pr/ssp370/pr_day_*.nc'
+        'tas': f'{BASE_DATA_PATH}/tas/ssp370/tas_day_*.nc',
+        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp370/tasmax_day_*.nc',
+        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp370/tasmin_day_*.nc',
+        'pr': f'{BASE_DATA_PATH}/pr/ssp370/pr_day_*.nc'
     },
     'ssp585': { 
-        'tas': 'data/tas/ssp585/tas_day_*.nc',
-        'tasmax': 'data/tasmax/ssp585/tasmax_day_*.nc',
-        'tasmin': 'data/tasmin/ssp585/tasmin_day_*.nc',
-        'pr': 'data/pr/ssp585/pr_day_*.nc'
+        'tas': f'{BASE_DATA_PATH}/tas/ssp585/tas_day_*.nc',
+        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp585/tasmax_day_*.nc',
+        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp585/tasmin_day_*.nc',
+        'pr': f'{BASE_DATA_PATH}/pr/ssp585/pr_day_*.nc'
     }
 }
 
 # Active scenario for processing
 ACTIVE_SCENARIO = 'historical'  # Change this to process different scenarios
 
-# Define climate periods
-CLIMATE_PERIODS = [
-    (2012, 2014, '2012-2014'),  # Historical baseline
-    # Future periods - uncomment when processing future scenarios:
-    # (2036, 2065, '2050s'),    # Mid-century
-    # (2071, 2100, '2080s')     # End-century
-]
+# Data availability assumptions:
+# Historical data: 1950-2014 (adjust start year based on your actual data)
+# Projection data: 2015-2100 (adjust end year based on your actual data)
+DATA_AVAILABILITY = {
+    'historical': {'start': 1950, 'end': 2014},
+    'ssp126': {'start': 2015, 'end': 2100},
+    'ssp245': {'start': 2015, 'end': 2100},
+    'ssp370': {'start': 2015, 'end': 2100},
+    'ssp585': {'start': 2015, 'end': 2100}
+}
+
+# Define climate periods - 30-year moving windows
+# For historical: annual climate measures from 1980-2014 (each based on 30-year window)
+# For projections: annual climate measures from 2015-2100 (each based on 30-year window)
+
+def generate_climate_periods(scenario):
+    """
+    Generate climate periods based on scenario.
+    Each period represents a 30-year window for calculating climate normals.
+    Each year's climate is based on the preceding 30 years ending in that year.
+    
+    Args:
+        scenario (str): Climate scenario ('historical' or projection scenario)
+        
+    Returns:
+        list: List of tuples (start_year, end_year, target_year, period_name)
+    """
+    periods = []
+    
+    # Get data availability for this scenario
+    if scenario not in DATA_AVAILABILITY:
+        print(f"Warning: No data availability info for scenario {scenario}, using historical defaults")
+        data_start = 1950
+        data_end = 2014
+    else:
+        data_start = DATA_AVAILABILITY[scenario]['start']
+        data_end = DATA_AVAILABILITY[scenario]['end']
+    
+    if scenario == 'historical':
+        # Historical: 1980-2014 (35 years of annual climate measures)
+        # Each year's climate is based on the preceding 30 years
+        for target_year in range(1980, 2015):
+            end_year = target_year      # Climate period ends in the target year
+            start_year = target_year - 29  # 30 years total (target_year - 29 to target_year inclusive)
+            
+            # Ensure we don't go outside available data
+            start_year = max(start_year, data_start)
+            end_year = min(end_year, data_end)
+            
+            # Only include if we have at least 20 years of data (2/3 of 30 years)
+            if end_year - start_year + 1 >= 20:
+                period_name = f"climate_{target_year}"
+                periods.append((start_year, end_year, target_year, period_name))
+    
+    else:
+        # Future scenarios: 2015-2100 (86 years of annual climate measures)
+        # Each year's climate is based on the preceding 30 years
+        for target_year in range(2015, 2101):
+            end_year = target_year      # Climate period ends in the target year
+            start_year = target_year - 29  # 30 years total (target_year - 29 to target_year inclusive)
+            
+            # Ensure we don't go outside available data
+            start_year = max(start_year, data_start)
+            end_year = min(end_year, data_end)
+            
+            # Only include if we have at least 20 years of data (2/3 of 30 years)
+            if end_year - start_year + 1 >= 20:
+                period_name = f"climate_{target_year}"
+                periods.append((start_year, end_year, target_year, period_name))
+    
+    print(f"Generated {len(periods)} climate periods for {scenario}")
+    print(f"  Data availability: {data_start}-{data_end}")
+    if periods:
+        print(f"  Climate periods: {periods[0][2]} to {periods[-1][2]} (target years)")
+        print(f"  Example: Climate for {periods[0][2]} based on {periods[0][0]}-{periods[0][1]} ({periods[0][1]-periods[0][0]+1} years)")
+    
+    return periods
+
+# Generate climate periods based on active scenario
+CLIMATE_PERIODS = generate_climate_periods(ACTIVE_SCENARIO)
 
 def get_year_from_filename(filename):
     """Extract year from filename."""
@@ -316,9 +468,9 @@ def process_file(file_path, variable_name, region_key):
 
 def process_period_region(period_info, variable_name, file_pattern, region_key):
     """Process a climate period for a specific variable and region."""
-    start_year, end_year, period_name = period_info
+    start_year, end_year, target_year, period_name = period_info
     region_name = REGION_BOUNDS[region_key]['name']
-    print(f"Processing {variable_name} for period {period_name} in {region_name}...")
+    print(f"Processing {variable_name} for period {period_name} ({start_year}-{end_year}, target: {target_year}) in {region_name}...")
     
     # Get all files for this period
     files = get_files_for_period(file_pattern, start_year, end_year)
@@ -340,7 +492,7 @@ def process_period_region(period_info, variable_name, file_pattern, region_key):
     
     # Extract the data arrays and align them by day of year
     years = [year for year, _ in results]
-    print(f"Processing years: {years}")
+    print(f"Processing years: {sorted(years)} (total: {len(years)} years)")
     
     # First, ensure all arrays have dayofyear as a coordinate
     data_arrays = []
@@ -356,20 +508,30 @@ def process_period_region(period_info, variable_name, file_pattern, region_key):
     stacked_data = xr.concat(data_arrays, dim=xr.DataArray(years, dims='year', name='year'))
     print(f"Stacked data dimensions: {stacked_data.dims}")
     
-    # First compute mean over years for each unique dayofyear
-    print("Computing climate averages...")
+    # Compute 30-year climate normal (mean over years for each unique dayofyear)
+    print(f"Computing 30-year climate normal for target year {target_year}...")
     # Group by dayofyear and compute mean, reducing both year and time dimensions
     climate_avg = stacked_data.groupby('dayofyear').mean(dim=['year', 'time'])
     print(f"Climate average dimensions: {climate_avg.dims}")
     
-    # Create new time coordinates
-    reference_year = 2000
+    # Create new time coordinates using the target year as reference
+    reference_year = target_year
     days = climate_avg.dayofyear.values
     dates = [np.datetime64(f'{reference_year}-01-01') + np.timedelta64(int(d-1), 'D') for d in days]
     
     # Assign new time coordinate using dayofyear as the dimension
     climate_avg = climate_avg.assign_coords(time=('dayofyear', dates))
     climate_avg = climate_avg.swap_dims({'dayofyear': 'time'})
+    
+    # Add metadata about the climate period
+    climate_avg.attrs.update({
+        'climate_period_start': start_year,
+        'climate_period_end': end_year,
+        'climate_target_year': target_year,
+        'climate_period_length': end_year - start_year + 1,
+        'description': f'30-year climate normal based on {start_year}-{end_year}'
+    })
+    
     print(f"Final dimensions: {climate_avg.dims}")
     
     return climate_avg
@@ -410,6 +572,21 @@ def main():
     print(f"Starting climate data processing at {start_time}")
     print(f"Processing scenario: {ACTIVE_SCENARIO}")
     
+    # Validate external drive path before proceeding
+    if not validate_external_drive():
+        print("Exiting due to path validation errors.")
+        return
+    
+    # Generate climate periods for the active scenario
+    global CLIMATE_PERIODS
+    CLIMATE_PERIODS = generate_climate_periods(ACTIVE_SCENARIO)
+    print(f"Generated {len(CLIMATE_PERIODS)} climate periods for {ACTIVE_SCENARIO}")
+    if len(CLIMATE_PERIODS) > 0:
+        first_period = CLIMATE_PERIODS[0]
+        last_period = CLIMATE_PERIODS[-1]
+        print(f"  First period: {first_period[3]} (target: {first_period[2]}, window: {first_period[0]}-{first_period[1]})")
+        print(f"  Last period: {last_period[3]} (target: {last_period[2]}, window: {last_period[0]}-{last_period[1]})")
+    
     # Initialize dask client for distributed computing
     cluster = LocalCluster(n_workers=MAX_PROCESSES, memory_limit=MEMORY_LIMIT)
     client = Client(cluster)
@@ -428,7 +605,7 @@ def main():
             
             # Process each climate period
             for period in CLIMATE_PERIODS:
-                period_name = period[2]
+                start_year, end_year, target_year, period_name = period
                 
                 # Process each region
                 for region_key in REGION_BOUNDS.keys():
@@ -453,27 +630,46 @@ def main():
                             region_datasets[region_key] = xr.Dataset()
                         
                         # Add to region dataset
-                        var_id = f"{var_name}_{period_name}"
+                        var_id = f"{var_name}_{target_year}"
                         region_datasets[region_key][var_id] = climate_avg
-                        print(f"Added {var_name} for {period_name} in {region_name} to output dataset")
+                        print(f"Added {var_name} for target year {target_year} in {region_name} to output dataset")
         
         # Save separate files for each region
         for region_key, ds in region_datasets.items():
             region_name = REGION_BOUNDS[region_key]['name'].lower().replace(' ', '_')
             
-            # Include scenario in output filename
-            output_file = os.path.join(OUTPUT_DIR, f'{region_name}_{ACTIVE_SCENARIO}_climate_averages.nc')
+            # Include scenario in output filename with descriptive naming
+            if ACTIVE_SCENARIO == 'historical':
+                output_file = os.path.join(OUTPUT_DIR, f'{region_name}_{ACTIVE_SCENARIO}_30yr_climate_normals_1980-2014.nc')
+            else:
+                output_file = os.path.join(OUTPUT_DIR, f'{region_name}_{ACTIVE_SCENARIO}_30yr_climate_normals_2015-2100.nc')
             
             # Convert longitudes if specified in the region settings
             if REGION_BOUNDS[region_key].get('convert_longitudes', False):
                 print(f"Converting longitudes for {region_name} from 0-360 to -180 to 180 format...")
                 ds = convert_longitudes_to_standard(ds)
             
+            # Add global attributes to the dataset
+            ds.attrs.update({
+                'title': f'30-year Climate Normals for {REGION_BOUNDS[region_key]["name"]}',
+                'scenario': ACTIVE_SCENARIO,
+                'methodology': '30-year moving window climate normals',
+                'temporal_coverage': '1980-2014' if ACTIVE_SCENARIO == 'historical' else '2015-2100',
+                'spatial_coverage': REGION_BOUNDS[region_key]['name'],
+                'created': datetime.now().isoformat(),
+                'description': 'Annual climate measures based on 30-year moving windows. Each year represents the climate normal based on the preceding 30 years.',
+                'variables': 'tas (mean temperature), tasmax (maximum temperature), tasmin (minimum temperature), pr (precipitation)',
+                'units_temperature': 'degrees Celsius',
+                'units_precipitation': 'mm/day'
+            })
+            
             # Save the dataset - trigger computation
             print(f"Computing and saving {region_name} data...")
             ds = ds.compute()  # Explicitly compute before saving
             ds.to_netcdf(output_file)
             print(f"Saved {region_name} data to {output_file}")
+            print(f"  Variables: {list(ds.data_vars.keys())}")
+            print(f"  Time range: {len([v for v in ds.data_vars.keys() if v.startswith('tas_')])} annual climate measures")
         
         end_time = datetime.now()
         runtime = end_time - start_time

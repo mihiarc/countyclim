@@ -363,14 +363,15 @@ def compute_daily_zonal_stats(climate_data, counties, variable, stat_type, outpu
         for batch_start in range(0, total_days, batch_size):
             batch_end = min(batch_start + batch_size, total_days)
             
-            # Get batch data as a delayed object (don't compute yet)
+            # Pre-compute batch data immediately for faster development feedback
             batch_slice = slice(batch_start, batch_end)
-            batch_data = var_data.isel(time=batch_slice)
+            logger.info(f"Loading batch {batch_start//batch_size + 1}/{total_batches}: days {batch_start} to {batch_end}")
+            batch_data = var_data.isel(time=batch_slice).compute()  # Load data immediately
             batch_dates = dates[batch_start:batch_end]
             
-            # Create a delayed task for the entire batch
+            # Create a delayed task for the batch processing (no large arrays in graph)
             future = dask.delayed(process_batch_of_days)(
-                batch_data.values,  # This will be computed lazily
+                batch_data.values,  # Now a small numpy array, not a delayed computation
                 batch_dates,
                 batch_start,
                 temp_counties_file,  # File path, not the object itself
