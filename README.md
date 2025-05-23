@@ -6,8 +6,90 @@ A sophisticated climate data processing pipeline for calculating county-level cl
 
 The pipeline consists of two main components:
 
-1. **`climate_means.py`** - Preprocesses daily climate data into 30-year climate normals
-2. **`county_stats.py`** - Calculates county-level climate statistics using zonal statistics
+1. **`climate_means.py`** - Preprocesses daily climate data into 30-year climate normals (legacy script)
+2. **`climate_processing/`** - Refactored modular package following data engineering best practices
+3. **`county_stats.py`** - Calculates county-level climate statistics using zonal statistics
+
+## Refactored Module Structure
+
+The climate processing functionality has been refactored into a modular package with the following structure:
+
+```
+climate_processing/
+├── __init__.py          # Package initialization
+├── config.py            # Configuration management with environment variable support
+├── regions.py           # Regional definitions and CRS management
+├── periods.py           # Climate period generation logic
+├── processors.py        # Main processing orchestration
+└── utils.py            # Utility functions and helpers
+```
+
+### Key Benefits of the Refactored Structure
+
+1. **Separation of Concerns**: Each module has a single, well-defined responsibility
+2. **Configuration Management**: Centralized configuration with environment variable support
+3. **Testability**: Individual components can be tested in isolation
+4. **Reusability**: Components can be imported and used independently
+5. **Maintainability**: Easier to understand, modify, and extend
+
+### Using the Refactored Module
+
+#### Command Line Interface
+
+```bash
+# Process historical data (default)
+python process_climate_data.py
+
+# Process a specific scenario
+python process_climate_data.py --scenario ssp245
+
+# Use custom paths
+python process_climate_data.py --external-drive /path/to/drive --output-dir /path/to/output
+
+# Disable parallel processing
+python process_climate_data.py --no-parallel
+
+# Set memory limits
+python process_climate_data.py --memory-limit 16GB --max-processes 8
+```
+
+#### Environment Variables
+
+Configure the pipeline using environment variables:
+
+```bash
+export CLIMATE_EXTERNAL_DRIVE=/Volumes/RPA1TB
+export CLIMATE_BASE_DATA_PATH=/Volumes/RPA1TB/NorESM2-LM
+export CLIMATE_OUTPUT_DIR=output/climate_means
+export CLIMATE_ACTIVE_SCENARIO=historical
+export CLIMATE_MAX_PROCESSES=6
+export CLIMATE_MEMORY_LIMIT=8GB
+```
+
+#### Python API
+
+```python
+from climate_processing import ClimateConfig, ClimateProcessor
+
+# Create configuration
+config = ClimateConfig({
+    'active_scenario': 'ssp245',
+    'external_drive_path': '/Volumes/MyDrive',
+    'max_processes': 8
+})
+
+# Create and run processor
+processor = ClimateProcessor(config)
+processor.process()
+```
+
+#### Testing the Module
+
+Run the test script to verify the installation:
+
+```bash
+python test_climate_processing.py
+```
 
 ## Features
 

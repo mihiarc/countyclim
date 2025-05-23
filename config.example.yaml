@@ -1,0 +1,37 @@
+# Example configuration file for climate data processing
+# Copy this to config.yaml and modify as needed
+
+# External drive configuration
+external_drive_path: /Volumes/RPA1TB  # Update this to your external drive
+base_data_path: ${external_drive_path}/data/NorESM2-LM  # Note: includes /data/ directory
+
+# Output configuration
+output_dir: output/climate_means
+
+# Processing configuration
+active_scenario: historical  # Options: historical, ssp126, ssp245, ssp370, ssp585
+parallel_processing: true
+max_processes: 6  # Number of parallel workers
+memory_limit: 8GB  # Memory limit per worker
+
+# Dask configuration
+chunk_size:
+  time: 365  # Process one year at a time
+
+# Data availability periods
+data_availability:
+  historical:
+    start: 1950
+    end: 2014
+  ssp126:
+    start: 2015
+    end: 2100
+  ssp245:
+    start: 2015
+    end: 2100
+  ssp370:
+    start: 2015
+    end: 2100
+  ssp585:
+    start: 2015
+    end: 2100 
