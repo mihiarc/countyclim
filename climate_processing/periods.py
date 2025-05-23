@@ -5,7 +5,7 @@ This module handles the generation of 30-year climate periods
 for different scenarios.
 """
 
-from typing import List, Tuple, Dict
+from typing import List, Dict
 from dataclasses import dataclass
 
 

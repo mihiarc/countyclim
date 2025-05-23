@@ -1,9 +1,9 @@
-# Example configuration file for climate data processing
-# Copy this to config.yaml and modify as needed
+# Configuration file for climate data processing
+# Modify as needed for your environment
 
-# External drive configuration
-external_drive_path: /Volumes/RPA1TB  # Update this to your external drive
-base_data_path: ${external_drive_path}/data/NorESM2-LM  # Note: includes /data/ directory
+# Data paths - using local data directory
+external_drive_path: data  # Local data directory in project
+base_data_path: ${external_drive_path}/NorESM2-LM  # Climate data subdirectory
 
 # Output configuration
 output_dir: output/climate_means
