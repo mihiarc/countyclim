@@ -17,7 +17,7 @@ The climate processing functionality has been refactored into a modular package 
 ```
 climate_processing/
 ├── __init__.py          # Package initialization
-├── config.py            # Configuration management with environment variable support
+├── config.py            # Configuration management with YAML and environment variable support
 ├── regions.py           # Regional definitions and CRS management
 ├── periods.py           # Climate period generation logic
 ├── processors.py        # Main processing orchestration
@@ -27,10 +27,96 @@ climate_processing/
 ### Key Benefits of the Refactored Structure
 
 1. **Separation of Concerns**: Each module has a single, well-defined responsibility
-2. **Configuration Management**: Centralized configuration with environment variable support
-3. **Testability**: Individual components can be tested in isolation
-4. **Reusability**: Components can be imported and used independently
-5. **Maintainability**: Easier to understand, modify, and extend
+2. **YAML Configuration**: User-friendly configuration files with variable expansion
+3. **Flexible Configuration**: YAML files, environment variables, and runtime overrides
+4. **Local Data Support**: Works with local data directories (no external drive required)
+5. **Testability**: Individual components can be tested in isolation
+6. **Reusability**: Components can be imported and used independently
+7. **Maintainability**: Easier to understand, modify, and extend
+
+## Configuration
+
+### Configuration Hierarchy (Highest to Lowest Priority)
+
+1. **Runtime overrides** (passed to `ClimateConfig()`)
+2. **Environment variables** (e.g., `CLIMATE_EXTERNAL_DRIVE`)
+3. **YAML configuration file** (`config.yaml`)
+4. **Built-in defaults** (local `data/` directory)
+
+### YAML Configuration
+
+Create or modify `config.yaml` in the project root:
+
+```yaml
+# Configuration file for climate data processing
+# Modify as needed for your environment
+
+# Data paths - using local data directory
+external_drive_path: data  # Local data directory in project
+base_data_path: ${external_drive_path}/NorESM2-LM  # Climate data subdirectory
+
+# Output configuration
+output_dir: output/climate_means
+
+# Processing configuration
+active_scenario: historical  # Options: historical, ssp126, ssp245, ssp370, ssp585
+parallel_processing: true
+max_processes: 6  # Number of parallel workers
+memory_limit: 8GB  # Memory limit per worker
+
+# Dask configuration
+chunk_size:
+  time: 365  # Process one year at a time
+
+# Data availability periods
+data_availability:
+  historical:
+    start: 1950
+    end: 2014
+  ssp126:
+    start: 2015
+    end: 2100
+  ssp245:
+    start: 2015
+    end: 2100
+  ssp370:
+    start: 2015
+    end: 2100
+  ssp585:
+    start: 2015
+    end: 2100
+```
+
+### Expected Data Structure
+
+The pipeline now supports both local and external data storage:
+
+#### Local Data Structure (Default)
+```
+countyclim/
+├── data/
+│   └── NorESM2-LM/
+│       ├── tas/
+│       │   ├── historical/
+│       │   ├── ssp126/
+│       │   ├── ssp245/
+│       │   ├── ssp370/
+│       │   └── ssp585/
+│       ├── tasmax/
+│       ├── tasmin/
+│       └── pr/
+├── config.yaml
+└── climate_processing/
+```
+
+#### External Drive Structure (Optional)
+```
+/Volumes/RPA1TB/data/NorESM2-LM/
+├── tas/
+├── tasmax/
+├── tasmin/
+└── pr/
+```
 
 ### Using the Refactored Module
 
@@ -42,6 +128,9 @@ python process_climate_data.py
 
 # Process a specific scenario
 python process_climate_data.py --scenario ssp245
+
+# Use custom configuration file
+python process_climate_data.py --config custom_config.yaml
 
 # Use custom paths
 python process_climate_data.py --external-drive /path/to/drive --output-dir /path/to/output
@@ -55,11 +144,11 @@ python process_climate_data.py --memory-limit 16GB --max-processes 8
 
 #### Environment Variables
 
-Configure the pipeline using environment variables:
+Configure the pipeline using environment variables (overrides YAML config):
 
 ```bash
-export CLIMATE_EXTERNAL_DRIVE=/Volumes/RPA1TB
-export CLIMATE_BASE_DATA_PATH=/Volumes/RPA1TB/NorESM2-LM
+export CLIMATE_EXTERNAL_DRIVE=/Volumes/RPA1TB/data
+export CLIMATE_BASE_DATA_PATH=/Volumes/RPA1TB/data/NorESM2-LM
 export CLIMATE_OUTPUT_DIR=output/climate_means
 export CLIMATE_ACTIVE_SCENARIO=historical
 export CLIMATE_MAX_PROCESSES=6
@@ -71,16 +160,24 @@ export CLIMATE_MEMORY_LIMIT=8GB
 ```python
 from climate_processing import ClimateConfig, ClimateProcessor
 
-# Create configuration
-config = ClimateConfig({
+# Load default config.yaml
+config = ClimateConfig()
+
+# Load custom YAML file
+config = ClimateConfig(config_file='custom_config.yaml')
+
+# Load YAML + runtime overrides
+config = ClimateConfig(config_dict={
     'active_scenario': 'ssp245',
-    'external_drive_path': '/Volumes/MyDrive',
     'max_processes': 8
 })
 
 # Create and run processor
 processor = ClimateProcessor(config)
 processor.process()
+
+# Save current configuration
+config.save_config('my_config.yaml')
 ```
 
 #### Testing the Module
@@ -152,40 +249,32 @@ uv pip install -r requirements.txt
 pip install -r requirements.txt
 ```
 
-## Configuration
-
-### External Drive Setup
-
-Update the external drive path in `climate_means.py`:
-
-```python
-# Update this path to your external drive mount point
-EXTERNAL_DRIVE_PATH = '/Volumes/RPA1TB'  # macOS
-# EXTERNAL_DRIVE_PATH = 'D:'             # Windows
-# EXTERNAL_DRIVE_PATH = '/media/username/drive'  # Linux
-```
-
-### Expected Data Structure
-
-```
-/Volumes/RPA1TB/NorESM2-LM/
-├── tas/
-│   ├── historical/
-│   ├── ssp126/
-│   ├── ssp245/
-│   ├── ssp370/
-│   └── ssp585/
-├── tasmax/
-├── tasmin/
-└── pr/
-```
-
 ## Usage
 
-### Step 1: Process Climate Data
+### Step 1: Setup Configuration
+
+1. **Copy and modify the configuration file**:
+   ```bash
+   cp config.yaml my_config.yaml
+   # Edit my_config.yaml as needed
+   ```
+
+2. **For local data**: Place your climate data in the `data/` directory:
+   ```bash
+   mkdir -p data/NorESM2-LM
+   # Copy your NetCDF files to appropriate subdirectories
+   ```
+
+3. **For external data**: Update the `external_drive_path` in `config.yaml`
+
+### Step 2: Process Climate Data
 
 ```bash
+# Using default config.yaml
 python climate_means.py
+
+# Using custom configuration
+python climate_means.py --config my_config.yaml
 ```
 
 This generates regional climate normals in `output/climate_means/`:
@@ -195,7 +284,7 @@ This generates regional climate normals in `output/climate_means/`:
 - `puerto_rico_and_u.s._virgin_islands_historical_30yr_climate_normals_1980-2014.nc`
 - `guam_and_northern_mariana_islands_historical_30yr_climate_normals_1980-2014.nc`
 
-### Step 2: Calculate County Statistics
+### Step 3: Calculate County Statistics
 
 ```bash
 python county_stats.py
@@ -299,6 +388,7 @@ Core scientific computing stack:
 - **rasterstats**: Zonal statistics
 - **netCDF4**: Climate data I/O
 - **numpy/pandas**: Numerical computing
+- **PyYAML**: YAML configuration file support
 
 See `requirements.txt` for complete dependency list.
 
@@ -306,11 +396,11 @@ See `requirements.txt` for complete dependency list.
 
 This pipeline is designed for climate data analysis workflows. Key areas for enhancement:
 
-1. **Modularization**: Split large scripts into focused modules
-2. **Configuration management**: Environment-based configuration
-3. **Testing**: Unit tests for core processing functions
-4. **Data validation**: Quality checks for input climate data
-5. **Error recovery**: Fault-tolerant processing for large datasets
+1. **Additional climate indices**: Expand beyond basic temperature and precipitation metrics
+2. **Data validation**: Quality checks for input climate data
+3. **Error recovery**: Fault-tolerant processing for large datasets
+4. **Visualization**: Built-in plotting and mapping capabilities
+5. **Documentation**: Enhanced API documentation and tutorials
 
 ## License
 

@@ -62,6 +62,7 @@ class ClimateProcessor:
         start_time = datetime.now()
         print(f"Starting climate data processing at {start_time}")
         print(f"Processing scenario: {self.config.active_scenario}")
+        print(f"Processing variables: {', '.join(self.config.active_variables)}")
         
         try:
             # Validate paths
@@ -78,9 +79,14 @@ class ClimateProcessor:
                 print("No climate periods to process")
                 return
             
-            # Process each region
-            scenario_patterns = self.config.scenarios[self.config.active_scenario]
+            # Get file patterns for active variables only
+            scenario_patterns = self.config.get_active_scenario_patterns()
             
+            if not scenario_patterns:
+                print("No variables to process based on current configuration")
+                return
+            
+            # Process each region
             for region_key in self.region_manager.list_regions():
                 region = self.region_manager.get_region(region_key)
                 print(f"\nProcessing region: {region.name}")
@@ -98,6 +104,7 @@ class ClimateProcessor:
             runtime = end_time - start_time
             print(f"\nProcessing complete!")
             print(f"Total runtime: {runtime}")
+            print(f"Processed variables: {', '.join(self.config.active_variables)}")
             
         finally:
             # Always cleanup Dask resources
@@ -122,19 +129,19 @@ class ClimateProcessor:
     def _process_region(self, region: Region, periods: List[ClimatePeriod],
                        scenario_patterns: Dict[str, str]) -> Optional[xr.Dataset]:
         """
-        Process all variables and periods for a specific region.
+        Process all active variables and periods for a specific region.
         
         Args:
             region: Region to process
             periods: List of climate periods
-            scenario_patterns: File patterns for each variable
+            scenario_patterns: File patterns for each active variable
             
         Returns:
             xarray Dataset with processed climate data, or None if processing failed
         """
         region_dataset = xr.Dataset()
         
-        # Process each variable
+        # Process each active variable
         for var_name, file_pattern in scenario_patterns.items():
             print(f"\n  Processing {var_name} for {region.name}...")
             
@@ -295,8 +302,15 @@ class ClimateProcessor:
         """Save processed region data to NetCDF file."""
         # Prepare output filename
         is_historical = self.config.active_scenario == 'historical'
+        
+        # Include variable information in filename if not processing all variables
+        if len(self.config.active_variables) < 4:  # Less than all 4 variables
+            var_suffix = "_" + "_".join(sorted(self.config.active_variables))
+        else:
+            var_suffix = ""
+        
         output_filename = format_output_filename(
-            region.name, self.config.active_scenario, is_historical
+            region.name, self.config.active_scenario, is_historical, var_suffix
         )
         output_path = os.path.join(self.config.output_dir, output_filename)
         
@@ -309,6 +323,7 @@ class ClimateProcessor:
         dataset.attrs.update({
             'title': f'30-year Climate Normals for {region.name}',
             'scenario': self.config.active_scenario,
+            'variables_processed': ', '.join(self.config.active_variables),
             'methodology': '30-year moving window climate normals',
             'temporal_coverage': '1980-2014' if is_historical else '2015-2100',
             'spatial_coverage': region.name,
@@ -327,7 +342,7 @@ class ClimateProcessor:
         dataset.to_netcdf(output_path)
         print(f"  Saved {region.name} data to {output_path}")
         print(f"    Variables: {list(dataset.data_vars.keys())}")
-        print(f"    Time range: {len([v for v in dataset.data_vars.keys() if v.startswith('tas_')])} "
+        print(f"    Time range: {len([v for v in dataset.data_vars.keys() if any(v.startswith(var + '_') for var in self.config.active_variables)])} "
               f"annual climate measures")
         
         # Log memory usage after saving

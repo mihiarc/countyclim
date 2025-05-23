@@ -10,6 +10,15 @@ output_dir: output/climate_means
 
 # Processing configuration
 active_scenario: historical  # Options: historical, ssp126, ssp245, ssp370, ssp585
+active_variables:  # Variables to process (leave empty or comment out to process all)
+  - tas      # Mean temperature
+  - tasmax   # Maximum temperature  
+  - tasmin   # Minimum temperature
+  - pr       # Precipitation
+  # To process only specific variables, comment out the ones you don't want:
+  # - tas
+  # - pr
+
 parallel_processing: true
 max_processes: 6  # Number of parallel workers
 memory_limit: 8GB  # Memory limit per worker

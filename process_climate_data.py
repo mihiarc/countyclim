@@ -30,6 +30,18 @@ def main():
         help='Climate scenario to process (default: historical)'
     )
     parser.add_argument(
+        '--variable',
+        type=str,
+        choices=['tas', 'tasmax', 'tasmin', 'pr', 'all'],
+        default='all',
+        help='Climate variable to process (default: all). Options: tas (mean temp), tasmax (max temp), tasmin (min temp), pr (precipitation), all'
+    )
+    parser.add_argument(
+        '--config',
+        type=str,
+        help='Path to YAML configuration file (default: config.yaml)'
+    )
+    parser.add_argument(
         '--external-drive',
         type=str,
         help='Path to external drive (overrides CLIMATE_EXTERNAL_DRIVE env var)'
@@ -65,10 +77,14 @@ def main():
         'parallel_processing': not args.no_parallel
     }
     
+    # Add variable selection
+    if args.variable != 'all':
+        config_overrides['active_variables'] = [args.variable]
+    
     # Add optional overrides
     if args.external_drive:
         config_overrides['external_drive_path'] = args.external_drive
-        config_overrides['base_data_path'] = f'{args.external_drive}/data/NorESM2-LM'
+        config_overrides['base_data_path'] = f'{args.external_drive}/NorESM2-LM'
     
     if args.max_processes:
         config_overrides['max_processes'] = args.max_processes
@@ -78,7 +94,7 @@ def main():
     
     # Create configuration and processor
     try:
-        config = ClimateConfig(config_overrides)
+        config = ClimateConfig(config_file=args.config, config_dict=config_overrides)
         processor = ClimateProcessor(config)
         
         # Run processing

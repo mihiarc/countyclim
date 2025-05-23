@@ -126,7 +126,8 @@ def get_year_from_filename(filename: str) -> Optional[int]:
     return None
 
 
-def format_output_filename(region_name: str, scenario: str, is_historical: bool = True) -> str:
+def format_output_filename(region_name: str, scenario: str, is_historical: bool = True, 
+                          var_suffix: str = "") -> str:
     """
     Generate standardized output filename for climate data.
     
@@ -134,6 +135,7 @@ def format_output_filename(region_name: str, scenario: str, is_historical: bool 
         region_name: Name of the region
         scenario: Climate scenario name
         is_historical: Whether this is historical data
+        var_suffix: Optional suffix for specific variables (e.g., "_tas_pr")
         
     Returns:
         Formatted filename
@@ -142,9 +144,9 @@ def format_output_filename(region_name: str, scenario: str, is_historical: bool 
     clean_region = region_name.lower().replace(' ', '_').replace('.', '')
     
     if is_historical:
-        return f'{clean_region}_{scenario}_30yr_climate_normals_1980-2014.nc'
+        return f'{clean_region}_{scenario}_30yr_climate_normals_1980-2014{var_suffix}.nc'
     else:
-        return f'{clean_region}_{scenario}_30yr_climate_normals_2015-2100.nc'
+        return f'{clean_region}_{scenario}_30yr_climate_normals_2015-2100{var_suffix}.nc'
 
 
 def log_memory_usage() -> None:

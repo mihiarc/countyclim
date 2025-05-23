@@ -10,7 +10,7 @@ import yaml
 import multiprocessing as mp
 import psutil
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 
 class ClimateConfig:
@@ -85,6 +85,15 @@ class ClimateConfig:
         self.max_processes = int(os.getenv('CLIMATE_MAX_PROCESSES', 
                                          str(yaml_config.get('max_processes', mp.cpu_count() - 2))))
         
+        # Active variables configuration
+        yaml_active_vars = yaml_config.get('active_variables', ['tas', 'tasmax', 'tasmin', 'pr'])
+        env_active_vars = os.getenv('CLIMATE_ACTIVE_VARIABLES')
+        if env_active_vars:
+            # Parse comma-separated environment variable
+            self.active_variables = [var.strip() for var in env_active_vars.split(',')]
+        else:
+            self.active_variables = yaml_active_vars if yaml_active_vars else ['tas', 'tasmax', 'tasmin', 'pr']
+        
         # Dask configuration
         yaml_chunk_size = yaml_config.get('chunk_size', {})
         self.chunk_size = {'time': int(os.getenv('CLIMATE_CHUNK_SIZE', 
@@ -146,6 +155,11 @@ class ClimateConfig:
             }
         }
     
+    def get_active_scenario_patterns(self) -> Dict[str, str]:
+        """Get file patterns for active variables in the active scenario."""
+        all_patterns = self.scenarios[self.active_scenario]
+        return {var: pattern for var, pattern in all_patterns.items() if var in self.active_variables}
+    
     @property
     def data_availability(self) -> Dict[str, Dict[str, int]]:
         """Get data availability periods for each scenario."""
@@ -168,6 +182,19 @@ class ClimateConfig:
             raise ValueError(f"Invalid scenario: {self.active_scenario}. "
                            f"Must be one of {list(self.scenarios.keys())}")
         
+        # Validate active variables
+        valid_variables = ['tas', 'tasmax', 'tasmin', 'pr']
+        invalid_vars = [var for var in self.active_variables if var not in valid_variables]
+        if invalid_vars:
+            raise ValueError(f"Invalid variables: {invalid_vars}. "
+                           f"Must be one or more of {valid_variables}")
+        
+        if not self.active_variables:
+            print("Warning: No active variables specified. Will process all variables.")
+            self.active_variables = valid_variables
+        
+        print(f"Active variables: {', '.join(self.active_variables)}")
+        
         return True
     
     def save_config(self, output_file: Optional[str] = None):
@@ -180,6 +207,7 @@ class ClimateConfig:
             'base_data_path': self.base_data_path,
             'output_dir': self.output_dir,
             'active_scenario': self.active_scenario,
+            'active_variables': self.active_variables,
             'parallel_processing': self.parallel_processing,
             'max_processes': self.max_processes,
             'memory_limit': self.memory_limit,
@@ -203,10 +231,11 @@ class ClimateConfig:
             'chunk_size': self.chunk_size,
             'memory_limit': self.memory_limit,
             'active_scenario': self.active_scenario,
+            'active_variables': self.active_variables,
             'scenarios': self.scenarios,
             'data_availability': self.data_availability
         }
     
     def __repr__(self) -> str:
         """String representation of configuration."""
-        return f"ClimateConfig(scenario='{self.active_scenario}', output='{self.output_dir}')" 
+        return f"ClimateConfig(scenario='{self.active_scenario}', variables={self.active_variables}, output='{self.output_dir}')" 
