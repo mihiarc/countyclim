@@ -146,10 +146,10 @@ def get_region_crs_info(region_key):
 # Configuration - ADJUST THESE PATHS AND SETTINGS FOR YOUR ENVIRONMENT
 SCENARIOS = {
     'historical': {
-        'tas': 'data/tas/tas_day_*.nc',
+        'tas': 'data/tas/historical/tas_day_*.nc',
         'tasmax': 'data/tasmax/historical/tasmax_day_*.nc',
-        'tasmin': 'data/tasmin/tasmin_day_*.nc',
-        'pr': 'data/pr/pr_day_*.nc'
+        'tasmin': 'data/tasmin/historical/tasmin_day_*.nc',
+        'pr': 'data/pr/historical/pr_day_*.nc'
     },
     'ssp126': { 
         'tas': 'data/tas/ssp126/tas_day_*.nc',
