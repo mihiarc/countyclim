@@ -30,9 +30,10 @@ climate_processing/
 2. **YAML Configuration**: User-friendly configuration files with variable expansion
 3. **Flexible Configuration**: YAML files, environment variables, and runtime overrides
 4. **Local Data Support**: Works with local data directories (no external drive required)
-5. **Testability**: Individual components can be tested in isolation
-6. **Reusability**: Components can be imported and used independently
-7. **Maintainability**: Easier to understand, modify, and extend
+5. **Granular Processing**: Process specific variables and regions independently
+6. **Testability**: Individual components can be tested in isolation
+7. **Reusability**: Components can be imported and used independently
+8. **Maintainability**: Easier to understand, modify, and extend
 
 ## Configuration
 
@@ -60,6 +61,26 @@ output_dir: output/climate_means
 
 # Processing configuration
 active_scenario: historical  # Options: historical, ssp126, ssp245, ssp370, ssp585
+
+active_variables:  # Variables to process (leave empty or comment out to process all)
+  - tas      # Mean temperature
+  - tasmax   # Maximum temperature  
+  - tasmin   # Minimum temperature
+  - pr       # Precipitation
+  # To process only specific variables, comment out the ones you don't want:
+  # - tas
+  # - pr
+
+active_regions:  # Regions to process (leave empty or comment out to process all)
+  - CONUS    # Continental United States
+  - AK       # Alaska
+  - HI       # Hawaii and Islands
+  - PRVI     # Puerto Rico and U.S. Virgin Islands
+  - GU       # Guam and Northern Mariana Islands
+  # To process only specific regions, comment out the ones you don't want:
+  # - CONUS
+  # - AK
+
 parallel_processing: true
 max_processes: 6  # Number of parallel workers
 memory_limit: 8GB  # Memory limit per worker
@@ -123,11 +144,23 @@ countyclim/
 #### Command Line Interface
 
 ```bash
-# Process historical data (default)
+# Process all variables and regions (default)
 python process_climate_data.py
 
 # Process a specific scenario
 python process_climate_data.py --scenario ssp245
+
+# Process specific variables
+python process_climate_data.py --variable tas  # Temperature only
+python process_climate_data.py --variable pr   # Precipitation only
+
+# Process specific regions
+python process_climate_data.py --region CONUS  # Continental US only
+python process_climate_data.py --region AK     # Alaska only
+
+# Combine variable and region selection
+python process_climate_data.py --variable tas --region CONUS
+python process_climate_data.py --variable pr --region HI
 
 # Use custom configuration file
 python process_climate_data.py --config custom_config.yaml
@@ -140,7 +173,27 @@ python process_climate_data.py --no-parallel
 
 # Set memory limits
 python process_climate_data.py --memory-limit 16GB --max-processes 8
+
+# Complex example: Process precipitation for Alaska using SSP245 scenario
+python process_climate_data.py --scenario ssp245 --variable pr --region AK
 ```
+
+#### Available Options
+
+**Variables:**
+- `tas` - Mean temperature
+- `tasmax` - Maximum temperature
+- `tasmin` - Minimum temperature
+- `pr` - Precipitation
+- `all` - All variables (default)
+
+**Regions:**
+- `CONUS` - Continental United States
+- `AK` - Alaska
+- `HI` - Hawaii and Islands
+- `PRVI` - Puerto Rico and U.S. Virgin Islands
+- `GU` - Guam and Northern Mariana Islands
+- `all` - All regions (default)
 
 #### Environment Variables
 
@@ -151,6 +204,8 @@ export CLIMATE_EXTERNAL_DRIVE=/Volumes/RPA1TB/data
 export CLIMATE_BASE_DATA_PATH=/Volumes/RPA1TB/data/NorESM2-LM
 export CLIMATE_OUTPUT_DIR=output/climate_means
 export CLIMATE_ACTIVE_SCENARIO=historical
+export CLIMATE_ACTIVE_VARIABLES="tas,pr"  # Comma-separated
+export CLIMATE_ACTIVE_REGIONS="CONUS,AK"  # Comma-separated
 export CLIMATE_MAX_PROCESSES=6
 export CLIMATE_MEMORY_LIMIT=8GB
 ```
@@ -169,6 +224,8 @@ config = ClimateConfig(config_file='custom_config.yaml')
 # Load YAML + runtime overrides
 config = ClimateConfig(config_dict={
     'active_scenario': 'ssp245',
+    'active_variables': ['tas', 'pr'],
+    'active_regions': ['CONUS'],
     'max_processes': 8
 })
 
@@ -193,6 +250,7 @@ python test_climate_processing.py
 ### Climate Data Preprocessing (`climate_means.py`)
 
 - **Multi-region support**: CONUS, Alaska, Hawaii, Puerto Rico/USVI, Guam/Northern Mariana Islands
+- **Selective processing**: Process specific variables and regions independently
 - **30-year moving window climate normals**: Each year's climate based on preceding 30 years
 - **Multiple climate scenarios**: Historical (1950-2014) and future projections (SSP126, SSP245, SSP370, SSP585)
 - **Coordinate system handling**: Automatic conversion between 0-360° and -180°/180° longitude systems
@@ -270,19 +328,21 @@ pip install -r requirements.txt
 ### Step 2: Process Climate Data
 
 ```bash
-# Using default config.yaml
-python climate_means.py
+# Using default config.yaml (all variables, all regions)
+python process_climate_data.py
 
 # Using custom configuration
-python climate_means.py --config my_config.yaml
+python process_climate_data.py --config my_config.yaml
+
+# Process specific combinations
+python process_climate_data.py --variable tas --region CONUS
+python process_climate_data.py --scenario ssp245 --variable pr --region AK
 ```
 
-This generates regional climate normals in `output/climate_means/`:
-- `conus_historical_30yr_climate_normals_1980-2014.nc`
-- `alaska_historical_30yr_climate_normals_1980-2014.nc`
-- `hawaii_and_islands_historical_30yr_climate_normals_1980-2014.nc`
-- `puerto_rico_and_u.s._virgin_islands_historical_30yr_climate_normals_1980-2014.nc`
-- `guam_and_northern_mariana_islands_historical_30yr_climate_normals_1980-2014.nc`
+This generates regional climate normals in `output/climate_means/`. Example outputs:
+- `conus_historical_30yr_climate_normals_1980-2014.nc` (all variables)
+- `alaska_historical_30yr_climate_normals_1980-2014_tas.nc` (temperature only)
+- `hawaii_and_islands_ssp245_30yr_climate_normals_2015-2100_pr.nc` (precipitation only)
 
 ### Step 3: Calculate County Statistics
 
@@ -295,6 +355,40 @@ This generates county-level statistics in `output/county_climate_stats/`:
 - `county_climate_stats.gpkg` - Climate statistics with geometries
 - `performance_metrics.json` - Detailed performance metrics
 - `county_*_daily.parquet` - Daily statistics for each variable
+
+## Workflow Examples
+
+### Targeted Processing Workflows
+
+```bash
+# Process only temperature data for Continental US
+python process_climate_data.py --variable tas --region CONUS
+
+# Process precipitation for all Pacific regions
+python process_climate_data.py --variable pr --region HI
+python process_climate_data.py --variable pr --region GU
+
+# Process future scenarios for Alaska
+python process_climate_data.py --scenario ssp245 --region AK
+python process_climate_data.py --scenario ssp585 --region AK
+
+# Process specific variable combinations
+python process_climate_data.py --variable tasmax --region CONUS  # Heat analysis
+python process_climate_data.py --variable tasmin --region AK     # Cold analysis
+```
+
+### Parallel Processing Strategies
+
+```bash
+# Run different regions in parallel (different terminals/machines)
+python process_climate_data.py --region CONUS &
+python process_climate_data.py --region AK &
+python process_climate_data.py --region HI &
+
+# Run different variables in parallel
+python process_climate_data.py --variable tas --region CONUS &
+python process_climate_data.py --variable pr --region CONUS &
+```
 
 ## Performance Monitoring
 
@@ -350,12 +444,14 @@ pr (mm/day) = pr (kg m⁻² s⁻¹) × 86400
 - **Dask best practices**: Avoided large computation graphs with batch processing
 - **Memory efficiency**: Lazy data loading and configurable memory limits
 - **Parallel processing**: Optimized task distribution across multiple workers
+- **Selective processing**: Process only needed variables and regions
 - **I/O optimization**: Efficient file formats (NetCDF, Parquet) and temporary file management
 
 ### Error Handling
 
 - **Path validation**: Automatic detection of available drives and data paths
 - **Data validation**: Checks for required variables and coordinate systems
+- **Configuration validation**: Validates variable and region selections
 - **Graceful degradation**: Comprehensive logging for debugging
 
 ### Climate Methodology
@@ -370,7 +466,7 @@ pr (mm/day) = pr (kg m⁻² s⁻¹) × 86400
 - **Variables**: tas, tasmax, tasmin, pr (temperature and precipitation)
 - **Temporal resolution**: Daily climate normals for each target year
 - **Spatial resolution**: Original model grid resolution
-- **Metadata**: Climate period information, units, methodology
+- **Metadata**: Climate period information, units, methodology, processed variables/regions
 
 ### County Statistics (CSV/GeoPackage)
 - **mean_annual_temp**: Annual mean temperature (°C)

@@ -37,6 +37,13 @@ def main():
         help='Climate variable to process (default: all). Options: tas (mean temp), tasmax (max temp), tasmin (min temp), pr (precipitation), all'
     )
     parser.add_argument(
+        '--region',
+        type=str,
+        choices=['CONUS', 'AK', 'HI', 'PRVI', 'GU', 'all'],
+        default='all',
+        help='Region to process (default: all). Options: CONUS (Continental US), AK (Alaska), HI (Hawaii), PRVI (Puerto Rico/USVI), GU (Guam/CNMI), all'
+    )
+    parser.add_argument(
         '--config',
         type=str,
         help='Path to YAML configuration file (default: config.yaml)'
@@ -80,6 +87,10 @@ def main():
     # Add variable selection
     if args.variable != 'all':
         config_overrides['active_variables'] = [args.variable]
+    
+    # Add region selection
+    if args.region != 'all':
+        config_overrides['active_regions'] = [args.region]
     
     # Add optional overrides
     if args.external_drive:

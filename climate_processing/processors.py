@@ -63,6 +63,7 @@ class ClimateProcessor:
         print(f"Starting climate data processing at {start_time}")
         print(f"Processing scenario: {self.config.active_scenario}")
         print(f"Processing variables: {', '.join(self.config.active_variables)}")
+        print(f"Processing regions: {', '.join(self.config.active_regions)}")
         
         try:
             # Validate paths
@@ -86,8 +87,12 @@ class ClimateProcessor:
                 print("No variables to process based on current configuration")
                 return
             
-            # Process each region
-            for region_key in self.region_manager.list_regions():
+            # Process only active regions
+            for region_key in self.config.active_regions:
+                if region_key not in self.region_manager.list_regions():
+                    print(f"Warning: Region '{region_key}' not found in region manager")
+                    continue
+                    
                 region = self.region_manager.get_region(region_key)
                 print(f"\nProcessing region: {region.name}")
                 
@@ -99,12 +104,15 @@ class ClimateProcessor:
                 if region_dataset:
                     # Save the processed data
                     self._save_region_data(region, region_dataset)
+                else:
+                    print(f"  No data processed for region {region.name}")
             
             end_time = datetime.now()
             runtime = end_time - start_time
             print(f"\nProcessing complete!")
             print(f"Total runtime: {runtime}")
             print(f"Processed variables: {', '.join(self.config.active_variables)}")
+            print(f"Processed regions: {', '.join(self.config.active_regions)}")
             
         finally:
             # Always cleanup Dask resources
@@ -324,6 +332,7 @@ class ClimateProcessor:
             'title': f'30-year Climate Normals for {region.name}',
             'scenario': self.config.active_scenario,
             'variables_processed': ', '.join(self.config.active_variables),
+            'region_processed': region.name,
             'methodology': '30-year moving window climate normals',
             'temporal_coverage': '1980-2014' if is_historical else '2015-2100',
             'spatial_coverage': region.name,

@@ -94,6 +94,15 @@ class ClimateConfig:
         else:
             self.active_variables = yaml_active_vars if yaml_active_vars else ['tas', 'tasmax', 'tasmin', 'pr']
         
+        # Active regions configuration
+        yaml_active_regions = yaml_config.get('active_regions', ['CONUS', 'AK', 'HI', 'PRVI', 'GU'])
+        env_active_regions = os.getenv('CLIMATE_ACTIVE_REGIONS')
+        if env_active_regions:
+            # Parse comma-separated environment variable
+            self.active_regions = [region.strip() for region in env_active_regions.split(',')]
+        else:
+            self.active_regions = yaml_active_regions if yaml_active_regions else ['CONUS', 'AK', 'HI', 'PRVI', 'GU']
+        
         # Dask configuration
         yaml_chunk_size = yaml_config.get('chunk_size', {})
         self.chunk_size = {'time': int(os.getenv('CLIMATE_CHUNK_SIZE', 
@@ -193,7 +202,19 @@ class ClimateConfig:
             print("Warning: No active variables specified. Will process all variables.")
             self.active_variables = valid_variables
         
+        # Validate active regions
+        valid_regions = ['CONUS', 'AK', 'HI', 'PRVI', 'GU']
+        invalid_regions = [region for region in self.active_regions if region not in valid_regions]
+        if invalid_regions:
+            raise ValueError(f"Invalid regions: {invalid_regions}. "
+                           f"Must be one or more of {valid_regions}")
+        
+        if not self.active_regions:
+            print("Warning: No active regions specified. Will process all regions.")
+            self.active_regions = valid_regions
+        
         print(f"Active variables: {', '.join(self.active_variables)}")
+        print(f"Active regions: {', '.join(self.active_regions)}")
         
         return True
     
@@ -208,6 +229,7 @@ class ClimateConfig:
             'output_dir': self.output_dir,
             'active_scenario': self.active_scenario,
             'active_variables': self.active_variables,
+            'active_regions': self.active_regions,
             'parallel_processing': self.parallel_processing,
             'max_processes': self.max_processes,
             'memory_limit': self.memory_limit,
@@ -232,10 +254,11 @@ class ClimateConfig:
             'memory_limit': self.memory_limit,
             'active_scenario': self.active_scenario,
             'active_variables': self.active_variables,
+            'active_regions': self.active_regions,
             'scenarios': self.scenarios,
             'data_availability': self.data_availability
         }
     
     def __repr__(self) -> str:
         """String representation of configuration."""
-        return f"ClimateConfig(scenario='{self.active_scenario}', variables={self.active_variables}, output='{self.output_dir}')" 
+        return f"ClimateConfig(scenario='{self.active_scenario}', variables={self.active_variables}, regions={self.active_regions}, output='{self.output_dir}')" 

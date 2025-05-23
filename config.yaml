@@ -19,6 +19,16 @@ active_variables:  # Variables to process (leave empty or comment out to process
   # - tas
   # - pr
 
+active_regions:  # Regions to process (leave empty or comment out to process all)
+  - CONUS    # Continental United States
+  - AK       # Alaska
+  - HI       # Hawaii and Islands
+  - PRVI     # Puerto Rico and U.S. Virgin Islands
+  - GU       # Guam and Northern Mariana Islands
+  # To process only specific regions, comment out the ones you don't want:
+  # - CONUS
+  # - AK
+
 parallel_processing: true
 max_processes: 6  # Number of parallel workers
 memory_limit: 8GB  # Memory limit per worker
