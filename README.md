@@ -1,154 +1,246 @@
-# Precipitation Data Conversion
+# Climate Data Processor v2.0 - Modular Edition
 
-## Converting Precipitation Flux (pr) to Millimeters (mm)
+A professional, modular climate data processing pipeline for calculating 30-year climate normals from daily NetCDF files with optimized Dask configuration and comprehensive error handling.
 
-Climate model outputs often provide precipitation as a flux in units of `kg m⁻² s⁻¹` (kilograms per square meter per second). To convert this to millimeters (mm) of precipitation over a given time period, use the following method:
+## 🏗️ Modular Architecture
 
-### Why This Works
-- 1 kg of water over 1 m² is equivalent to a 1 mm layer of water (since 1 liter = 1 kg = 1 mm over 1 m²).
-- The `s⁻¹` (per second) means the value is a rate, so you need to multiply by the number of seconds in your desired time period.
-
-### Formula
-For daily precipitation:
+The processor has been completely refactored into a clean, maintainable modular structure:
 
 ```
-pr (mm/day) = pr (kg m⁻² s⁻¹) × 86400
+climate_processor/
+├── main.py                          # Main entry point (~100 lines)
+├── climate_processor/               # Core processing package
+│   ├── __init__.py                 # Package initialization
+│   ├── config.py                   # Configuration management
+│   ├── data_processor.py           # Main processing orchestrator
+│   ├── file_handler.py             # File operations
+│   ├── regions.py                  # Regional definitions
+│   ├── dask_utils.py              # Dask optimization
+│   ├── validation.py              # Data validation
+│   ├── coordinates.py             # Coordinate systems
+│   ├── climate_calculations.py    # Climate computations
+│   └── io_utils.py                # I/O operations
+├── utils/                          # Utility modules
+│   ├── logging_utils.py           # Enhanced logging
+│   ├── memory_utils.py            # Memory monitoring
+│   └── diagnostics.py            # System diagnostics
+└── tests/                         # Test modules
+    └── ...
 ```
 
-Where 86400 is the number of seconds in a day (24 × 60 × 60).
+## ✨ Key Benefits of Modular Design
 
-### Example
-If the model output is `0.0001 kg m⁻² s⁻¹`, then:
+### 🔧 **Maintainability**
+- Each module has a single, clear responsibility
+- Easy to understand, modify, and extend
+- Clear interfaces between components
+- Comprehensive documentation per module
 
-```
-0.0001 × 86400 = 8.64 mm/day
-```
+### 🧪 **Testability**
+- Individual modules can be unit tested
+- Isolated functionality for better debugging
+- Mock-friendly interfaces for testing
 
-This is the standard approach used in climate science (see CMIP/ERA5/ECMWF documentation). 
+### 🔄 **Reusability**
+- Components can be reused in other projects
+- Easy to swap implementations
+- Clean dependency management
 
----
+### 📈 **Scalability**
+- Add new features without touching existing code
+- Plugin-style architecture for extensions
+- Easy to add new regions or processing methods
 
-# Temperature Conversion
+## 🚀 Quick Start
 
-## Kelvin to Celsius
-
-To convert temperature from Kelvin (K) to Celsius (°C):
-
-```
-T(°C) = T(K) - 273.15
-```
-
-**Example:**
-If the model output is `295.15 K`, then:
-```
-295.15 - 273.15 = 22 °C
-```
-
-## Kelvin to Fahrenheit
-
-To convert temperature from Kelvin (K) to Fahrenheit (°F):
-
-```
-T(°F) = (T(K) - 273.15) × 9/5 + 32
-```
-
-**Example:**
-If the model output is `295.15 K`, then:
-```
-(295.15 - 273.15) × 9/5 + 32 = 71.6 °F
-``` 
-
-# County Climate Statistics
-
-This project calculates county-level climate statistics from gridded climate data.
-
-## Features
-
-- Annual mean temperature
-- Annual count of days with maximum temperature > 90°F (32.22°C)
-- Annual count of days with minimum temperature < 32°F (0°C)
-- Total annual precipitation
-- Annual count of days with precipitation > 1 inch (25.4mm)
-
-## Performance Monitoring
-
-The script includes comprehensive performance monitoring to track efficiency gains and identify bottlenecks:
-
-### Features
-- **Real-time progress tracking** with progress bars
-- **Memory usage monitoring** (peak and average)
-- **Dask task monitoring** (concurrent tasks, task states)
-- **Stage-by-stage timing** for each processing step
-- **Parallel efficiency metrics** (speedup calculations)
-- **Automatic performance reporting** with detailed summaries
-
-### Usage
-
-1. **Run the main script** (performance metrics are automatically collected):
-   ```bash
-   python county_stats.py
-   ```
-
-2. **Performance metrics are saved** to `output/county_climate_stats/performance_metrics.json`
-
-3. **Compare performance between runs**:
-   ```bash
-   python performance_comparison.py baseline_metrics.json optimized_metrics.json
-   ```
-
-### Performance Metrics Collected
-
-- **Total execution time** and stage breakdowns
-- **Memory usage**: peak and average RAM consumption
-- **Dask efficiency**: task counts, parallel utilization
-- **Processing rates**: days/second, parallel speedup
-- **File sizes**: input data and output file sizes
-
-### Example Output
-
-```
-PERFORMANCE SUMMARY
-============================================================
-Total execution time: 245.67 seconds (4.09 minutes)
-Peak memory usage: 12.34 GB
-Average memory usage: 8.76 GB
-Max concurrent Dask tasks: 24
-
-Stage breakdown:
-  load_climate_data: 15.23s (6.2%)
-  compute_daily_zonal_stats_tas_2012-2014_mean: 89.45s (36.4%)
-  compute_daily_zonal_stats_pr_2012-2014_sum: 67.89s (27.6%)
-  create_final_dataset: 12.34s (5.0%)
-```
-
-### Optimization Benefits
-
-The current implementation includes several optimizations based on [Dask best practices](https://docs.dask.org/en/stable/best-practices.html):
-
-- **Avoided large computation graphs** by processing in batches
-- **Eliminated embedded large objects** by using file-based data passing
-- **Optimized memory usage** with lazy data loading
-- **Improved parallelization** with efficient task distribution
-
-## Installation
-
+### Installation
 ```bash
-# Using uv (recommended)
-uv pip install -r requirements.txt
-
-# Or using pip
+git clone <repository>
+cd climate_processor
 pip install -r requirements.txt
 ```
 
-## Usage
-
+### Basic Usage
 ```bash
-python county_stats.py
+# Run with defaults
+python main.py
+
+# Run diagnostics first
+python main.py --diagnostics
+
+# Override configuration
+python main.py --scenario ssp245 --variables "tas,pr"
 ```
 
-## Output Files
+## 📋 Module Overview
 
-- `county_climate_stats.csv` - Climate statistics in CSV format
-- `county_climate_stats.gpkg` - Climate statistics with geometries
-- `performance_metrics.json` - Detailed performance metrics
-- `county_*_daily.parquet` - Daily statistics for each variable 
+### Core Modules
+
+| Module | Purpose | Lines | Key Functions |
+|--------|---------|-------|---------------|
+| `main.py` | Entry point & CLI | ~100 | `main()`, argument parsing |
+| `config.py` | Configuration management | ~200 | `load_configuration()`, validation |
+| `data_processor.py` | Processing orchestrator | ~300 | `ClimateDataProcessor` class |
+| `file_handler.py` | File operations | ~400 | File discovery, validation |
+| `regions.py` | Regional operations | ~250 | Regional extraction, CRS info |
+| `dask_utils.py` | Dask optimization | ~200 | Cluster setup, resource config |
+| `climate_calculations.py` | Climate computations | ~300 | Climate normals, statistics |
+| `validation.py` | Data validation | ~150 | File & data quality checks |
+| `coordinates.py` | Coordinate systems | ~150 | Coordinate conversions |
+| `io_utils.py` | I/O operations | ~250 | Optimized NetCDF saving |
+
+### Utility Modules
+
+| Module | Purpose | Key Features |
+|--------|---------|--------------|
+| `logging_utils.py` | Enhanced logging | File & console output, log levels |
+| `memory_utils.py` | Memory monitoring | Real-time tracking, recommendations |
+| `diagnostics.py` | System diagnostics | Comprehensive system analysis |
+
+## 🔧 Configuration
+
+The processor uses a hierarchical configuration system:
+
+1. **Default values** (built into code)
+2. **Configuration file** (`climate_config.ini`)
+3. **Command line arguments** (highest priority)
+
+### Example Configuration
+```ini
+[paths]
+external_drive_path = /path/to/climate/data
+output_dir = output/climate_means
+
+[processing]
+active_scenario = historical
+batch_size = 20
+max_workers = 4
+
+[variables]
+variables = tas,tasmax,tasmin,pr
+```
+
+## 🧪 Testing Strategy
+
+Each module can be tested independently:
+
+```python
+# Example unit test
+from climate_processor.regions import extract_region, REGION_BOUNDS
+from climate_processor.validation import validate_netcdf_structure
+
+def test_region_extraction():
+    # Test regional data extraction
+    pass
+
+def test_file_validation():
+    # Test NetCDF file validation
+    pass
+```
+
+## 🔌 Extending the Processor
+
+### Adding New Regions
+```python
+# In climate_processor/regions.py
+REGION_BOUNDS['NEW_REGION'] = {
+    'name': 'New Region',
+    'lon_min': 240, 'lon_max': 250,
+    'lat_min': 30.0, 'lat_max': 40.0,
+    'convert_longitudes': True
+}
+```
+
+### Adding New Processing Methods
+```python
+# Create new module: climate_processor/new_calculations.py
+def custom_climate_statistic(data_array):
+    # Custom processing logic
+    return processed_data
+```
+
+### Adding New Output Formats
+```python
+# In climate_processor/io_utils.py
+def save_as_zarr(dataset, output_path):
+    # Custom output format
+    dataset.to_zarr(output_path)
+```
+
+## 🐛 Debugging
+
+The modular structure makes debugging much easier:
+
+1. **Identify the failing module** from log messages
+2. **Run module-specific tests** to isolate issues
+3. **Use module boundaries** to narrow down problems
+4. **Mock dependencies** for isolated testing
+
+### Debug Mode
+```bash
+python main.py --verbose  # Enable debug logging
+python main.py --diagnostics  # Run comprehensive diagnostics
+```
+
+## 📊 Performance Monitoring
+
+Each module includes performance monitoring:
+
+- **Memory usage** tracked at module boundaries
+- **Processing time** logged for each module
+- **Dask performance** monitored throughout
+- **System resources** continuously tracked
+
+## 🔄 Migration from Monolithic Version
+
+The modular version maintains full compatibility:
+
+- **Same CLI interface**
+- **Same configuration format**
+- **Same output format**
+- **Enhanced performance and reliability**
+
+## 🤝 Contributing
+
+The modular structure makes contributions easier:
+
+1. **Identify the relevant module** for your change
+2. **Make changes within module boundaries**
+3. **Add tests for your module**
+4. **Update module documentation**
+
+### Adding New Features
+1. Create new module if needed
+2. Update `__init__.py` files
+3. Add configuration options
+4. Add tests and documentation
+
+## 📈 Performance Comparison
+
+| Metric | Monolithic | Modular | Improvement |
+|--------|------------|---------|-------------|
+| Lines of code | ~1000 | ~200-400 per module | Better maintainability |
+| Memory efficiency | Good | Excellent | Optimized per module |
+| Debugging time | High | Low | Isolated components |
+| Test coverage | Difficult | Easy | Module-level testing |
+| Feature additions | Risky | Safe | Isolated changes |
+
+## 🔐 Error Handling
+
+Each module has comprehensive error handling:
+
+- **Module-level exception handling**
+- **Graceful degradation**
+- **Detailed error reporting**
+- **Recovery mechanisms**
+
+## 📚 Documentation
+
+Each module is self-documenting:
+
+- **Comprehensive docstrings**
+- **Type hints throughout**
+- **Usage examples**
+- **API documentation**
+
+This modular architecture transforms the climate processor from a monolithic script into a professional, maintainable software package that's easy to understand, test, and extend.

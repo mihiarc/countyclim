@@ -1,0 +1,43 @@
+2025-05-27 12:37:02,559 - INFO - 🚀 Starting Climate County Processing Performance Comparison
+2025-05-27 12:37:02,559 - INFO - ✅ Using climate data: output/climate_means/conus_historical_climate_means_2012-2014.nc
+2025-05-27 12:37:02,559 - INFO - ✅ Using county boundaries: output/county_boundaries/contiguous_us_counties.parquet
+2025-05-27 12:37:02,559 - INFO - 
+============================================================
+2025-05-27 12:37:02,559 - INFO - TESTING MULTIPROCESSING IMPLEMENTATION
+2025-05-27 12:37:02,559 - INFO - ============================================================
+2025-05-27 12:37:02,560 - INFO - Running county_stats.py for multiprocessing
+2025-05-27 12:37:02,560 - INFO - System monitoring started
+2025-05-27 12:37:02,560 - INFO - Executing command: /home/mihiarc/repos/climate-county/.venv/bin/python county_stats.py
+2025-05-27 12:38:52,007 - INFO - System monitoring stopped. Collected 218 data points
+2025-05-27 12:38:52,008 - INFO - ✅ county_stats.py completed successfully in 109.04 seconds
+2025-05-27 12:38:52,008 - INFO - 
+============================================================
+2025-05-27 12:38:52,008 - INFO - TESTING DASK IMPLEMENTATION
+2025-05-27 12:38:52,009 - INFO - ============================================================
+2025-05-27 12:38:52,009 - INFO - Running county_stats_dask.py for dask
+2025-05-27 12:38:52,009 - INFO - System monitoring started
+2025-05-27 12:38:52,010 - INFO - Executing command: /home/mihiarc/repos/climate-county/.venv/bin/python county_stats_dask.py
+2025-05-27 12:49:43,552 - INFO - System monitoring stopped. Collected 1298 data points
+2025-05-27 12:49:43,553 - INFO - ✅ county_stats_dask.py completed successfully in 651.40 seconds
+2025-05-27 12:49:43,554 - INFO - 
+============================================================
+2025-05-27 12:49:43,554 - INFO - VALIDATING OUTPUTS
+2025-05-27 12:49:43,554 - INFO - ============================================================
+2025-05-27 12:49:43,554 - INFO - Validating output files...
+2025-05-27 12:49:43,554 - WARNING - Missing output files - MP: True, Dask: False
+2025-05-27 12:49:43,557 - INFO - Raw results saved to output/performance_comparison/performance_results.json
+2025-05-27 12:49:43,557 - INFO - Creating performance visualizations...
+2025-05-27 12:49:45,913 - INFO - Visualizations saved to output/performance_comparison/visualizations
+2025-05-27 12:49:45,914 - INFO - Generating performance report...
+2025-05-27 12:49:45,915 - INFO - Performance report saved to output/performance_comparison/performance_report.md
+2025-05-27 12:49:45,915 - INFO - 
+============================================================
+2025-05-27 12:49:45,915 - INFO - PERFORMANCE COMPARISON SUMMARY
+2025-05-27 12:49:45,915 - INFO - ============================================================
+2025-05-27 12:49:45,916 - INFO - Multiprocessing: 1.82 minutes
+2025-05-27 12:49:45,916 - INFO - Dask: 10.86 minutes
+2025-05-27 12:49:45,916 - INFO - 🚀 Multiprocessing is 5.97x faster!
+2025-05-27 12:49:45,916 - INFO - ⚠️ Output validation found differences
+2025-05-27 12:49:45,916 - INFO - 
+📊 Detailed results available in: output/performance_comparison
+2025-05-27 12:49:45,916 - INFO - 🎉 Performance comparison completed!

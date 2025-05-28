@@ -1,9 +1,27 @@
 #!/usr/bin/env python3
 """
-Climate Data Processing Script
+Climate Data Processing Script - Enhanced and Fixed Version
 
 Processes daily temperature and precipitation NetCDF files to calculate
-annual climate averages for US territories.
+30-year climate normals for US territories with optimized Dask configuration.
+
+Data Requirements:
+----------------
+This script is designed to work with 30-year periods of daily climate data.
+For historical analysis (1981-2010 climate normal):
+- Daily data files from 1981-2010 named as: {var}_day_NorESM2-LM_historical_r1i1p1f1_gn_{year}_v1.1.nc
+  where {var} is one of: tas, tasmax, tasmin, pr
+  and {year} ranges from 1981 to 2010
+
+For future projections (2071-2100 climate normal):
+- Daily data files from 2071-2100 for each SSP scenario
+- File naming: {var}_day_NorESM2-LM_{scenario}_r1i1p1f1_gn_{year}_v1.1.nc
+  where scenario is one of: ssp126, ssp245, ssp370, ssp585
+
+Current Limitations:
+-----------------
+The current data directory only contains years 2012-2014.
+To properly calculate 30-year climate normals, please obtain the complete dataset.
 """
 
 import os
@@ -14,99 +32,231 @@ from datetime import datetime
 import multiprocessing as mp
 import dask
 from dask.distributed import Client, LocalCluster
+from dask.diagnostics import ProgressBar
 import psutil
 import platform
+import logging
+import configparser
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass
+from tqdm import tqdm
+import gc
 
-# Configuration - ADJUST THESE PATHS AND SETTINGS FOR YOUR ENVIRONMENT
-TEMP_FILE_PATTERN = 'data/tas/tas_day_*.nc'  # Updated file pattern
-PRECIP_FILE_PATTERN = 'data/pr/pr_day_*.nc'  # Updated file pattern
-OUTPUT_DIR = 'output/climate_means'  # Output directory
-PARALLEL_PROCESSING = True  # Set to False for serial processing
-MAX_PROCESSES = mp.cpu_count() - 2  # Number of processes to use
+# Import the file handler module (assuming it's in the same directory)
+from file_path_handler import create_file_handler, ClimateFileHandler
 
-# Dask configuration
-CHUNK_SIZE = {'time': 365}  # Chunk by one year of daily data
-MEMORY_LIMIT = f'{int(psutil.virtual_memory().total / (1024**3))}GB'  # Set memory limit based on system RAM
+# Set up logging with better formatting
+logging.basicConfig(
+    level=logging.INFO, 
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('climate_processing.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
-# External drive configuration - UPDATE THIS PATH TO YOUR EXTERNAL DRIVE
-EXTERNAL_DRIVE_PATH = '/Volumes/RPA1TB'  # Update this to your external drive mount point
+# Configuration Management
+def load_configuration():
+    """Load configuration from file or use defaults."""
+    config = configparser.ConfigParser()
+    
+    # Create default config if it doesn't exist
+    config_file = 'climate_config.ini'
+    if not os.path.exists(config_file):
+        config['paths'] = {
+            'external_drive_path': '/media/mihiarc/RPA1TB/data/NorESM2-LM',
+            'output_dir': 'output/climate_means'
+        }
+        config['processing'] = {
+            'active_scenario': 'historical',
+            'parallel_processing': 'True',
+            'batch_size': '20',
+            'max_workers': '4'
+        }
+        config['variables'] = {
+            'variables': 'tas,tasmax,tasmin,pr'
+        }
+        
+        with open(config_file, 'w') as f:
+            config.write(f)
+        logger.info(f"Created default configuration file: {config_file}")
+    else:
+        config.read(config_file)
+    
+    return config
 
-# Base data directory on external drive
-BASE_DATA_PATH = f'{EXTERNAL_DRIVE_PATH}/NorESM2-LM'
+# Load configuration
+CONFIG = load_configuration()
+
+# Configuration - Load from config file with fallbacks
+OUTPUT_DIR = CONFIG.get('paths', 'output_dir', fallback='output/climate_means')
+PARALLEL_PROCESSING = CONFIG.getboolean('processing', 'parallel_processing', fallback=True)
+EXTERNAL_DRIVE_PATH = CONFIG.get('paths', 'external_drive_path', 
+                                fallback='/media/mihiarc/RPA1TB/data/NorESM2-LM')
+ACTIVE_SCENARIO = CONFIG.get('processing', 'active_scenario', fallback='historical')
+BATCH_SIZE = CONFIG.getint('processing', 'batch_size', fallback=20)
+MAX_WORKERS = CONFIG.getint('processing', 'max_workers', fallback=4)
+
+# Variables to process
+VARIABLES = CONFIG.get('variables', 'variables', fallback='tas,tasmax,tasmin,pr').split(',')
+VARIABLES = [v.strip() for v in VARIABLES]
 
 # Create output directory if it doesn't exist
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def list_available_drives():
-    """List available drives to help identify the correct external drive path."""
-    system = platform.system()
-    print(f"\nDetected system: {system}")
-    
-    if system == "Darwin":  # macOS
-        volumes_path = "/Volumes"
-        if os.path.exists(volumes_path):
-            volumes = [d for d in os.listdir(volumes_path) if os.path.isdir(os.path.join(volumes_path, d))]
-            print(f"Available volumes in {volumes_path}:")
-            for vol in volumes:
-                print(f"  /Volumes/{vol}")
-    
-    elif system == "Windows":
-        import string
-        available_drives = ['%s:' % d for d in string.ascii_uppercase if os.path.exists('%s:' % d)]
-        print("Available drives:")
-        for drive in available_drives:
-            print(f"  {drive}")
-    
-    elif system == "Linux":
-        media_paths = ["/media", "/mnt"]
-        for media_path in media_paths:
-            if os.path.exists(media_path):
-                try:
-                    mounts = os.listdir(media_path)
-                    if mounts:
-                        print(f"Available mounts in {media_path}:")
-                        for mount in mounts:
-                            full_path = os.path.join(media_path, mount)
-                            if os.path.isdir(full_path):
-                                print(f"  {full_path}")
-                except PermissionError:
-                    print(f"  Permission denied accessing {media_path}")
+# Memory monitoring utilities
+def log_memory_usage(stage=""):
+    """Log current memory usage."""
+    process = psutil.Process()
+    memory_mb = process.memory_info().rss / 1024**2
+    memory_gb = memory_mb / 1024
+    logger.info(f"Memory usage {stage}: {memory_mb:.1f} MB ({memory_gb:.2f} GB)")
 
-# Validate external drive path
-def validate_external_drive():
-    """Validate that the external drive path exists and is accessible."""
-    if not os.path.exists(EXTERNAL_DRIVE_PATH):
-        print(f"ERROR: External drive path does not exist: {EXTERNAL_DRIVE_PATH}")
-        print("Please update EXTERNAL_DRIVE_PATH in the script to point to your external drive.")
-        print("Common paths:")
-        print("  macOS: /Volumes/YourDriveName")
-        print("  Windows: D: or E:")
-        print("  Linux: /media/username/drivename or /mnt/external")
+def validate_netcdf_structure(file_path: str, expected_vars: List[str]) -> bool:
+    """
+    Validate that NetCDF file has expected variables and dimensions.
+    
+    Args:
+        file_path (str): Path to NetCDF file
+        expected_vars (List[str]): List of expected variable names
         
-        # List available drives to help user
-        list_available_drives()
+    Returns:
+        bool: True if file structure is valid
+    """
+    try:
+        with xr.open_dataset(file_path) as ds:
+            # Check for expected variables
+            missing_vars = set(expected_vars) - set(ds.data_vars)
+            if missing_vars:
+                logger.warning(f"Missing variables in {file_path}: {missing_vars}")
+                return False
+            
+            # Check for required dimensions
+            required_dims = ['time', 'lat', 'lon']
+            missing_dims = set(required_dims) - set(ds.dims)
+            if missing_dims:
+                logger.warning(f"Missing dimensions in {file_path}: {missing_dims}")
+                return False
+            
+            # Check if time dimension has reasonable size
+            if ds.dims.get('time', 0) < 1:
+                logger.warning(f"Invalid time dimension size in {file_path}")
+                return False
+                
+            return True
+    except Exception as e:
+        logger.error(f"Cannot read {file_path}: {e}")
         return False
+
+def get_optimal_chunks(file_path):
+    """Determine optimal chunk size based on data dimensions and available memory."""
+    try:
+        with xr.open_dataset(file_path, decode_times=False) as ds:
+            time_size = ds.dims.get('time', 365)
+            lat_size = ds.dims.get('lat', 100)
+            lon_size = ds.dims.get('lon', 100)
+            
+            # Aim for ~50-100MB chunks for better performance
+            target_chunk_size = 75 * 1024 * 1024  # 75MB
+            element_size = 8  # 8 bytes for float64
+            
+            # Calculate optimal time chunking (at least 1 year, max 5 years)
+            time_chunk = min(time_size, max(365, min(365 * 5, time_size // 5)))
+            
+            # Calculate if we need spatial chunking
+            spatial_elements = lat_size * lon_size
+            total_elements = spatial_elements * time_chunk
+            
+            if total_elements * element_size > target_chunk_size:
+                # Need spatial chunking
+                spatial_chunk = int(np.sqrt(target_chunk_size // (time_chunk * element_size)))
+                spatial_chunk = max(10, min(spatial_chunk, 50))  # Reasonable bounds
+                
+                chunks = {
+                    'time': time_chunk,
+                    'lat': min(lat_size, spatial_chunk),
+                    'lon': min(lon_size, spatial_chunk)
+                }
+            else:
+                chunks = {'time': time_chunk}
+            
+            logger.debug(f"Optimal chunks for {Path(file_path).name}: {chunks}")
+            return chunks
+            
+    except Exception as e:
+        logger.warning(f"Could not determine optimal chunks for {file_path}: {e}")
+        # Fallback to conservative chunking
+        return {'time': 365, 'lat': 25, 'lon': 25}
+
+def configure_dask_resources():
+    """Configure Dask resources based on system capabilities and data characteristics."""
+    total_memory = psutil.virtual_memory().total
+    available_memory = psutil.virtual_memory().available
     
-    if not os.path.exists(BASE_DATA_PATH):
-        print(f"WARNING: Base data path does not exist: {BASE_DATA_PATH}")
-        print("Please ensure your climate data is organized in the expected directory structure.")
-        print("Expected structure:")
-        print(f"  {BASE_DATA_PATH}/")
-        print("    ├── tas/")
-        print("    │   ├── historical/")
-        print("    │   ├── ssp126/")
-        print("    │   ├── ssp245/")
-        print("    │   ├── ssp370/")
-        print("    │   └── ssp585/")
-        print("    ├── tasmax/")
-        print("    ├── tasmin/")
-        print("    └── pr/")
-        print("  OR if data is in a different structure, update BASE_DATA_PATH accordingly.")
-        return False
+    logger.info(f"System memory - Total: {total_memory / 1024**3:.1f}GB, Available: {available_memory / 1024**3:.1f}GB")
     
-    print(f"✓ External drive path validated: {EXTERNAL_DRIVE_PATH}")
-    print(f"✓ Base data path found: {BASE_DATA_PATH}")
-    return True
+    # Be conservative with memory allocation
+    # Use at most 50% of available memory, min 2GB per worker, max 4GB per worker
+    memory_per_worker = min(
+        4 * 1024**3,  # 4GB max per worker
+        max(2 * 1024**3, available_memory * 0.5 // 4)  # At least 2GB, up to 50% available / 4
+    )
+    
+    # Calculate number of workers based on memory constraints
+    max_workers_by_memory = int(available_memory * 0.5 // memory_per_worker)
+    max_workers_by_cpu = max(1, mp.cpu_count() - 1)  # Leave one core free
+    
+    n_workers = min(max_workers_by_memory, max_workers_by_cpu, MAX_WORKERS)  # Cap at configured max
+    
+    # Allow some threading for I/O operations
+    threads_per_worker = min(2, max(1, mp.cpu_count() // n_workers))
+    
+    config = {
+        'n_workers': n_workers,
+        'memory_limit': f'{int(memory_per_worker / 1024**3)}GB',
+        'threads_per_worker': threads_per_worker
+    }
+    
+    logger.info(f"Dask configuration: {config}")
+    return config
+
+def setup_dask_client():
+    """Set up and return a Dask distributed client with optimized configuration."""
+    logger.info("Initializing optimized Dask distributed computing...")
+    
+    dask_config = configure_dask_resources()
+    
+    cluster = LocalCluster(
+        **dask_config,
+        dashboard_address=':8787',
+        silence_logs=logging.ERROR,  # Reduce log noise
+        death_timeout='60s',  # Handle worker failures gracefully
+        processes=True,  # Use processes for better isolation
+    )
+    
+    client = Client(cluster)
+    
+    # Enable progress reporting
+    ProgressBar().register()
+    
+    logger.info(f"Dask dashboard available at: {client.dashboard_link}")
+    logger.info(f"Cluster info: {cluster}")
+    
+    return client, cluster
+
+def open_dataset_optimized(file_path, chunks):
+    """Open dataset with optimization for climate data."""
+    return xr.open_dataset(
+        file_path,
+        chunks=chunks,
+        engine='netcdf4',  # Usually faster than h5netcdf for large files
+        decode_times=True,
+        use_cftime=True,   # Handle climate calendars properly
+        parallel=True,     # Enable parallel reading where possible
+        cache=False        # Don't cache to save memory
+    )
 
 # Define regional bounds (for 0-360 longitude system)
 REGION_BOUNDS = {
@@ -152,235 +302,75 @@ REGION_BOUNDS = {
     }
 }
 
-# Define region-specific CRS settings
-def get_region_crs_info(region_key):
-    """
-    Get coordinate reference system information for a specific region.
-    
-    This function provides region-specific CRS settings for proper spatial data handling,
-    especially useful for visualization and advanced spatial analysis.
-    
-    Args:
-        region_key (str): Region identifier (CONUS, AK, HI, PRVI, GU)
-        
-    Returns:
-        dict: Dictionary with CRS information including:
-            - crs_type: Type of CRS specification ('epsg', 'proj4', or 'name')
-            - crs_value: The EPSG code, proj4 string, or projection name
-            - central_longitude: Central longitude for the projection (for visualization)
-            - central_latitude: Central latitude for the projection (for visualization)
-            - extent: Recommended map extent in degrees [lon_min, lon_max, lat_min, lat_max]
-    """
-    region_crs = {
-        'CONUS': {
-            'crs_type': 'epsg',
-            'crs_value': 5070,  # NAD83 / Conus Albers
-            'central_longitude': -96,
-            'central_latitude': 37.5,
-            'extent': [-125, -65, 25, 50]  # West, East, South, North
-        },
-        'AK': {
-            'crs_type': 'epsg',
-            'crs_value': 3338,  # NAD83 / Alaska Albers
-            'central_longitude': -154,
-            'central_latitude': 50,
-            'extent': [-170, -130, 50, 72]
-        },
-        'HI': {
-            'crs_type': 'proj4',
-            'crs_value': "+proj=aea +lat_1=8 +lat_2=18 +lat_0=13 +lon_0=157 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs",
-            'central_longitude': -157,
-            'central_latitude': 20,
-            'extent': [-178, -155, 18, 29]
-        },
-        'PRVI': {
-            'crs_type': 'epsg',
-            'crs_value': 6566,  # NAD83(2011) / Puerto Rico and Virgin Islands
-            'central_longitude': -66,
-            'central_latitude': 18,
-            'extent': [-68, -64, 17, 19]
-        },
-        'GU': {
-            'crs_type': 'epsg',
-            'crs_value': 32655,  # WGS 84 / UTM zone 55N
-            'central_longitude': 147,
-            'central_latitude': 13.5,
-            'extent': [144, 147, 13, 21]
-        }
-    }
-    
-    # Return CRS info for the requested region or a default if not found
-    if region_key in region_crs:
-        return region_crs[region_key]
-    else:
-        # Default to Albers Equal Area
-        return {
-            'crs_type': 'epsg',
-            'crs_value': 5070,
-            'central_longitude': -96,
-            'central_latitude': 37.5,
-            'extent': [-125, -65, 25, 50]
-        }
-
-# Configuration - ADJUST THESE PATHS AND SETTINGS FOR YOUR ENVIRONMENT
-SCENARIOS = {
-    'historical': {
-        'tas': f'{BASE_DATA_PATH}/tas/historical/tas_day_*.nc',
-        'tasmax': f'{BASE_DATA_PATH}/tasmax/historical/tasmax_day_*.nc',
-        'tasmin': f'{BASE_DATA_PATH}/tasmin/historical/tasmin_day_*.nc',
-        'pr': f'{BASE_DATA_PATH}/pr/historical/pr_day_*.nc'
-    },
-    'ssp126': { 
-        'tas': f'{BASE_DATA_PATH}/tas/ssp126/tas_day_*.nc',
-        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp126/tasmax_day_*.nc',
-        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp126/tasmin_day_*.nc',
-        'pr': f'{BASE_DATA_PATH}/pr/ssp126/pr_day_*.nc'
-    },
-    'ssp245': { 
-        'tas': f'{BASE_DATA_PATH}/tas/ssp245/tas_day_*.nc',
-        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp245/tasmax_day_*.nc',
-        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp245/tasmin_day_*.nc',
-        'pr': f'{BASE_DATA_PATH}/pr/ssp245/pr_day_*.nc'
-    },
-    'ssp370': { 
-        'tas': f'{BASE_DATA_PATH}/tas/ssp370/tas_day_*.nc',
-        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp370/tasmax_day_*.nc',
-        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp370/tasmin_day_*.nc',
-        'pr': f'{BASE_DATA_PATH}/pr/ssp370/pr_day_*.nc'
-    },
-    'ssp585': { 
-        'tas': f'{BASE_DATA_PATH}/tas/ssp585/tas_day_*.nc',
-        'tasmax': f'{BASE_DATA_PATH}/tasmax/ssp585/tasmax_day_*.nc',
-        'tasmin': f'{BASE_DATA_PATH}/tasmin/ssp585/tasmin_day_*.nc',
-        'pr': f'{BASE_DATA_PATH}/pr/ssp585/pr_day_*.nc'
-    }
-}
-
-# Active scenario for processing
-ACTIVE_SCENARIO = 'historical'  # Change this to process different scenarios
-
-# Data availability assumptions:
-# Historical data: 1950-2014 (adjust start year based on your actual data)
-# Projection data: 2015-2100 (adjust end year based on your actual data)
-DATA_AVAILABILITY = {
-    'historical': {'start': 1950, 'end': 2014},
-    'ssp126': {'start': 2015, 'end': 2100},
-    'ssp245': {'start': 2015, 'end': 2100},
-    'ssp370': {'start': 2015, 'end': 2100},
-    'ssp585': {'start': 2015, 'end': 2100}
-}
-
-# Define climate periods - 30-year moving windows
-# For historical: annual climate measures from 1980-2014 (each based on 30-year window)
-# For projections: annual climate measures from 2015-2100 (each based on 30-year window)
-
-def generate_climate_periods(scenario):
+def generate_climate_periods(scenario: str, data_availability: Dict) -> List[Tuple[int, int, int, str]]:
     """
     Generate climate periods based on scenario.
-    Each period represents a 30-year window for calculating climate normals.
-    Each year's climate is based on the preceding 30 years ending in that year.
+    For each target year, creates a 30-year period ending in that year.
     
     Args:
         scenario (str): Climate scenario ('historical' or projection scenario)
+        data_availability (Dict): Dictionary with data availability info
         
     Returns:
-        list: List of tuples (start_year, end_year, target_year, period_name)
+        List[Tuple[int, int, int, str]]: List of tuples (start_year, end_year, target_year, period_name)
     """
     periods = []
     
-    # Get data availability for this scenario
-    if scenario not in DATA_AVAILABILITY:
-        print(f"Warning: No data availability info for scenario {scenario}, using historical defaults")
-        data_start = 1950
-        data_end = 2014
-    else:
-        data_start = DATA_AVAILABILITY[scenario]['start']
-        data_end = DATA_AVAILABILITY[scenario]['end']
+    # Get available data range
+    data_range = data_availability.get(scenario, {'start': 1850, 'end': 2014})
+    data_start = data_range['start']
+    data_end = data_range['end']
     
     if scenario == 'historical':
-        # Historical: 1980-2014 (35 years of annual climate measures)
-        # Each year's climate is based on the preceding 30 years
-        for target_year in range(1980, 2015):
-            end_year = target_year      # Climate period ends in the target year
-            start_year = target_year - 29  # 30 years total (target_year - 29 to target_year inclusive)
-            
-            # Ensure we don't go outside available data
-            start_year = max(start_year, data_start)
-            end_year = min(end_year, data_end)
-            
-            # Only include if we have at least 20 years of data (2/3 of 30 years)
-            if end_year - start_year + 1 >= 20:
-                period_name = f"climate_{target_year}"
-                periods.append((start_year, end_year, target_year, period_name))
-    
+        # For historical, calculate 30-year periods for each year from 1980 to data_end
+        for target_year in range(1980, min(2015, data_end + 1)):
+            start_year = target_year - 29  # 30-year period ending in target_year
+            # Check if we have data for the full period
+            if start_year >= data_start:
+                period_name = f"historical_{target_year}"
+                periods.append((start_year, target_year, target_year, period_name))
+            else:
+                logger.warning(f"Insufficient data for 30-year period ending in {target_year}")
+                logger.warning(f"Would need data from {start_year}, but data starts at {data_start}")
     else:
-        # Future scenarios: 2015-2100 (86 years of annual climate measures)
-        # Each year's climate is based on the preceding 30 years
-        for target_year in range(2015, 2101):
-            end_year = target_year      # Climate period ends in the target year
-            start_year = target_year - 29  # 30 years total (target_year - 29 to target_year inclusive)
-            
-            # Ensure we don't go outside available data
-            start_year = max(start_year, data_start)
-            end_year = min(end_year, data_end)
-            
-            # Only include if we have at least 20 years of data (2/3 of 30 years)
-            if end_year - start_year + 1 >= 20:
-                period_name = f"climate_{target_year}"
-                periods.append((start_year, end_year, target_year, period_name))
+        # For projections, calculate 30-year periods for each year from 2015 to data_end
+        for target_year in range(2015, min(2101, data_end + 1)):
+            start_year = target_year - 29  # 30-year period ending in target_year
+            period_name = f"{scenario}_{target_year}"
+            periods.append((start_year, target_year, target_year, period_name))
     
-    print(f"Generated {len(periods)} climate periods for {scenario}")
-    print(f"  Data availability: {data_start}-{data_end}")
-    if periods:
-        print(f"  Climate periods: {periods[0][2]} to {periods[-1][2]} (target years)")
-        print(f"  Example: Climate for {periods[0][2]} based on {periods[0][0]}-{periods[0][1]} ({periods[0][1]-periods[0][0]+1} years)")
+    if not periods:
+        logger.warning(f"No valid periods generated for {scenario}")
+    else:
+        logger.info(f"Generated {len(periods)} periods for {scenario}:")
+        logger.info(f"First period: {periods[0][0]}-{periods[0][1]} (target: {periods[0][2]})")
+        logger.info(f"Last period: {periods[-1][0]}-{periods[-1][1]} (target: {periods[-1][2]})")
     
     return periods
 
-# Generate climate periods based on active scenario
-CLIMATE_PERIODS = generate_climate_periods(ACTIVE_SCENARIO)
-
-def get_year_from_filename(filename):
-    """Extract year from filename."""
-    base = os.path.basename(filename)
+def convert_longitude_bounds(lon_min: float, lon_max: float, is_0_360: bool) -> Dict[str, float]:
+    """
+    Convert longitude bounds between 0-360 and -180-180 coordinate systems.
     
-    # For tas files: tas_day_NorESM2-LM_historical_r1i1p1f1_gn_2012.nc
-    # For pr files: pr_day_NorESM2-LM_historical_r1i1p1f1_gn_2012_v1.1.nc
-    parts = base.split('_')
-    
-    # Look for year in parts that could contain it
-    for part in parts:
-        # Check if this part starts with '20' (for years 2012, 2013, etc.)
-        if part.startswith('20') and len(part) >= 4:
-            # Extract the first 4 characters if the part has additional content
-            year_str = part[:4]
-            try:
-                return int(year_str)
-            except ValueError:
-                continue
-    
-    print(f"Warning: Could not extract year from {filename}")
-    return None
-
-def get_files_for_period(file_pattern, start_year, end_year):
-    """Get all files for a given climate period."""
-    all_files = glob.glob(file_pattern)
-    period_files = []
-    
-    for f in all_files:
-        year = get_year_from_filename(f)
-        if year and start_year <= year <= end_year:
-            period_files.append(f)
-    
-    if not period_files:
-        print(f"Warning: No files found matching pattern {file_pattern} for years {start_year}-{end_year}")
-    else:
-        print(f"Found {len(period_files)} files for period {start_year}-{end_year}")
+    Args:
+        lon_min (float): Minimum longitude in original system
+        lon_max (float): Maximum longitude in original system
+        is_0_360 (bool): True if data uses 0-360 system
         
-    return sorted(period_files)
+    Returns:
+        Dict[str, float]: Converted longitude bounds
+    """
+    if is_0_360:
+        # Data is in 0-360, use bounds as-is
+        return {'lon_min': lon_min, 'lon_max': lon_max}
+    else:
+        # Convert from 0-360 to -180-180 system
+        converted_min = lon_min - 360 if lon_min > 180 else lon_min
+        converted_max = lon_max - 360 if lon_max > 180 else lon_max
+        return {'lon_min': converted_min, 'lon_max': converted_max}
 
-def extract_region(ds, region_bounds):
-    """Extract a specific region from the dataset."""
+def extract_region(ds: xr.Dataset, region_bounds: Dict) -> xr.Dataset:
+    """Extract a specific region from the dataset with improved coordinate handling."""
     # Check coordinate names
     lon_name = 'lon' if 'lon' in ds.coords else 'x'
     lat_name = 'lat' if 'lat' in ds.coords else 'y'
@@ -393,37 +383,21 @@ def extract_region(ds, region_bounds):
     is_0_360 = lon_min >= 0 and lon_max > 180
     
     # Convert region bounds to match the dataset's coordinate system
-    if is_0_360:
-        # Already in 0-360 system, use bounds as is
-        lon_bounds = {
-            'lon_min': region_bounds['lon_min'],
-            'lon_max': region_bounds['lon_max']
-        }
-    else:
-        # Convert from 0-360 to -180-180 system
-        lon_bounds = {
-            'lon_min': region_bounds['lon_min'] - 360 if region_bounds['lon_min'] > 180 else region_bounds['lon_min'],
-            'lon_max': region_bounds['lon_max'] - 360 if region_bounds['lon_max'] > 180 else region_bounds['lon_max']
-        }
+    lon_bounds = convert_longitude_bounds(
+        region_bounds['lon_min'], 
+        region_bounds['lon_max'], 
+        is_0_360
+    )
     
     # Handle the case where we cross the 0/360 or -180/180 boundary
     if lon_bounds['lon_min'] > lon_bounds['lon_max']:
-        if is_0_360:
-            region_ds = ds.where(
-                ((ds[lon_name] >= lon_bounds['lon_min']) | 
-                 (ds[lon_name] <= lon_bounds['lon_max'])) & 
-                (ds[lat_name] >= region_bounds['lat_min']) & 
-                (ds[lat_name] <= region_bounds['lat_max']), 
-                drop=True
-            )
-        else:
-            region_ds = ds.where(
-                ((ds[lon_name] >= lon_bounds['lon_min']) | 
-                 (ds[lon_name] <= lon_bounds['lon_max'])) & 
-                (ds[lat_name] >= region_bounds['lat_min']) & 
-                (ds[lat_name] <= region_bounds['lat_max']), 
-                drop=True
-            )
+        region_ds = ds.where(
+            ((ds[lon_name] >= lon_bounds['lon_min']) | 
+             (ds[lon_name] <= lon_bounds['lon_max'])) & 
+            (ds[lat_name] >= region_bounds['lat_min']) & 
+            (ds[lat_name] <= region_bounds['lat_max']), 
+            drop=True
+        )
     else:
         region_ds = ds.where(
             (ds[lon_name] >= lon_bounds['lon_min']) & 
@@ -435,108 +409,168 @@ def extract_region(ds, region_bounds):
     
     # Check if we have data
     if region_ds[lon_name].size == 0 or region_ds[lat_name].size == 0:
-        print(f"Warning: No data found within region bounds after filtering.")
-        print(f"Dataset longitude range: {lon_min} to {lon_max}")
-        print(f"Region bounds: {region_bounds['lon_min']} to {region_bounds['lon_max']} (original)")
-        if is_0_360:
-            print(f"Region bounds (in 0-360): {lon_bounds['lon_min']} to {lon_bounds['lon_max']}")
-        else:
-            print(f"Region bounds (in -180-180): {lon_bounds['lon_min']} to {lon_bounds['lon_max']}")
+        logger.warning(f"No data found within region bounds after filtering.")
+        logger.warning(f"Dataset longitude range: {lon_min} to {lon_max}")
+        logger.warning(f"Region bounds: {region_bounds['lon_min']} to {region_bounds['lon_max']} (original)")
+        logger.warning(f"Converted bounds: {lon_bounds['lon_min']} to {lon_bounds['lon_max']}")
     
     return region_ds
 
-def process_file(file_path, variable_name, region_key):
-    """Process a single NetCDF file to get daily values for a specific region."""
+def process_file_lazy_wrapper(file_path: str, variable_name: str, region_key: str, 
+                             file_handler: ClimateFileHandler) -> Tuple[Optional[int], Optional[xr.DataArray]]:
+    """Wrapper function to process a single NetCDF file with file_handler access."""
     try:
-        # Open the file with dask chunking
-        ds = xr.open_dataset(file_path, chunks=CHUNK_SIZE)
+        # Validate file structure first
+        if not validate_netcdf_structure(file_path, [variable_name]):
+            logger.error(f"Invalid file structure: {file_path}")
+            return None, None
         
-        # Extract region
+        # Get optimal chunks for this file
+        optimal_chunks = get_optimal_chunks(file_path)
+        
+        # Open with optimized settings but keep data lazy
+        ds = open_dataset_optimized(file_path, optimal_chunks)
+        
+        # Extract region (still lazy)
         region_ds = extract_region(ds, REGION_BOUNDS[region_key])
         
-        # Get the daily values (no averaging) - keep as dask array
+        # Get the daily values (keep as dask array)
         daily_data = region_ds[variable_name]
         
-        # Get year from filename
-        year = get_year_from_filename(file_path)
+        # Get year from filename using file_handler
+        year = file_handler.extract_year_from_filename(file_path)
         
-        return year, daily_data
+        return year, daily_data  # Return lazy dask array
         
     except Exception as e:
-        print(f"Error processing {file_path} for region {region_key}: {e}")
+        logger.error(f"Error processing {file_path} for region {region_key}: {e}")
         return None, None
 
-def process_period_region(period_info, variable_name, file_pattern, region_key):
-    """Process a climate period for a specific variable and region."""
-    start_year, end_year, target_year, period_name = period_info
-    region_name = REGION_BOUNDS[region_key]['name']
-    print(f"Processing {variable_name} for period {period_name} ({start_year}-{end_year}, target: {target_year}) in {region_name}...")
+def compute_climate_normal_efficiently(data_arrays: List[xr.DataArray], years: List[int], 
+                                     target_year: int) -> xr.DataArray:
+    """Compute climate normal with optimized memory management and chunking."""
+    logger.info(f"Computing climate normal for target year {target_year} using {len(years)} years of data")
     
-    # Get all files for this period
-    files = get_files_for_period(file_pattern, start_year, end_year)
+    # Concatenate with proper dimension
+    logger.info("Concatenating data arrays...")
+    stacked_data = xr.concat(
+        data_arrays, 
+        dim=xr.DataArray(years, dims='year', name='year')
+    )
     
-    if not files:
-        print(f"No files found for {variable_name} during {period_name}")
-        return None
+    # Add dayofyear coordinate efficiently
+    logger.info("Adding dayofyear coordinate...")
+    dayofyear = stacked_data.time.dt.dayofyear
+    stacked_data = stacked_data.assign_coords(dayofyear=('time', dayofyear))
     
-    # Process files using dask delayed
-    results = []
-    for f in files:
-        year, data = process_file(f, variable_name, region_key)
-        if year is not None:
-            results.append((year, data))
+    # Rechunk for optimal groupby operation
+    logger.info("Rechunking for optimal groupby operation...")
+    optimal_chunks = {
+        'year': len(years),  # Keep all years together for groupby
+        'lat': 25,
+        'lon': 25
+    }
     
-    if not results:
-        print(f"No valid data for {variable_name} during {period_name} in {region_name}")
-        return None
+    # Only rechunk if current chunking is significantly different
+    current_chunks = stacked_data.chunks
+    if 'year' not in current_chunks or current_chunks.get('year', [0])[0] != len(years):
+        stacked_data = stacked_data.chunk(optimal_chunks)
     
-    # Extract the data arrays and align them by day of year
-    years = [year for year, _ in results]
-    print(f"Processing years: {sorted(years)} (total: {len(years)} years)")
-    
-    # First, ensure all arrays have dayofyear as a coordinate
-    data_arrays = []
-    for _, data in results:
-        # Calculate dayofyear while preserving original structure
-        dayofyear = data.time.dt.dayofyear.data  # Extract the underlying numpy array
-        # Add dayofyear as a coordinate without changing dimensions
-        with_doy = data.assign_coords(dayofyear=('time', dayofyear))
-        data_arrays.append(with_doy)
-    
-    # Stack the arrays along a new 'year' dimension
-    print("Concatenating data arrays...")
-    stacked_data = xr.concat(data_arrays, dim=xr.DataArray(years, dims='year', name='year'))
-    print(f"Stacked data dimensions: {stacked_data.dims}")
-    
-    # Compute 30-year climate normal (mean over years for each unique dayofyear)
-    print(f"Computing 30-year climate normal for target year {target_year}...")
-    # Group by dayofyear and compute mean, reducing both year and time dimensions
-    climate_avg = stacked_data.groupby('dayofyear').mean(dim=['year', 'time'])
-    print(f"Climate average dimensions: {climate_avg.dims}")
+    # Compute climate average using groupby (still lazy)
+    logger.info("Computing climate average...")
+    climate_avg = stacked_data.groupby('dayofyear').mean(dim=['year'])
     
     # Create new time coordinates using the target year as reference
-    reference_year = target_year
     days = climate_avg.dayofyear.values
-    dates = [np.datetime64(f'{reference_year}-01-01') + np.timedelta64(int(d-1), 'D') for d in days]
+    dates = [np.datetime64(f'{target_year}-01-01') + np.timedelta64(int(d-1), 'D') for d in days]
     
-    # Assign new time coordinate using dayofyear as the dimension
+    # Assign new time coordinate
     climate_avg = climate_avg.assign_coords(time=('dayofyear', dates))
     climate_avg = climate_avg.swap_dims({'dayofyear': 'time'})
     
     # Add metadata about the climate period
     climate_avg.attrs.update({
-        'climate_period_start': start_year,
-        'climate_period_end': end_year,
+        'climate_period_start': min(years),
+        'climate_period_end': max(years),
         'climate_target_year': target_year,
-        'climate_period_length': end_year - start_year + 1,
-        'description': f'30-year climate normal based on {start_year}-{end_year}'
+        'climate_period_length': len(years),
+        'description': f'Climate normal for {target_year}, based on {min(years)}-{max(years)}'
     })
     
-    print(f"Final dimensions: {climate_avg.dims}")
-    
-    return climate_avg
+    return climate_avg  # Return lazy array
 
-def convert_longitudes_to_standard(ds):
+def process_period_region_optimized(period_info: Tuple[int, int, int, str], variable_name: str, 
+                                  file_handler: ClimateFileHandler, region_key: str) -> Optional[xr.DataArray]:
+    """Process a climate period for a specific variable and region - optimized version."""
+    start_year, end_year, target_year, period_name = period_info
+    region_name = REGION_BOUNDS[region_key]['name']
+    
+    # Calculate the number of years in the period
+    period_length = end_year - start_year + 1
+    
+    logger.info(f"Processing {variable_name} for {period_name}")
+    logger.info(f"{period_length}-year period: {start_year}-{end_year} (target: {target_year})")
+    logger.info(f"Region: {region_name}")
+    
+    if period_length != 30:
+        logger.warning(f"Period length ({period_length} years) is not the standard 30 years")
+    
+    # Extract scenario from period_name
+    scenario = period_name.split('_')[0]
+    
+    # Get all files for this period using the file handler
+    files = file_handler.get_files_for_period(variable_name, scenario, start_year, end_year)
+    
+    if not files:
+        logger.warning(f"No files found for {variable_name} during {period_name}")
+        return None
+    
+    # Process files using dask delayed (keep everything lazy)
+    logger.info(f"Creating delayed tasks for {len(files)} files...")
+    delayed_results = []
+    for f in files:
+        # Use wrapper function that has access to file_handler
+        delayed_result = dask.delayed(process_file_lazy_wrapper)(f, variable_name, region_key, file_handler)
+        delayed_results.append(delayed_result)
+    
+    # Compute delayed tasks to get data arrays (but keep arrays lazy)
+    logger.info("Computing file processing tasks...")
+    results = dask.compute(*delayed_results)
+    
+    # Filter out None results
+    valid_results = [r for r in results if r[0] is not None]
+    
+    if not valid_results:
+        logger.warning(f"No valid data for {variable_name} during {period_name} in {region_name}")
+        return None
+    
+    # Extract years and data arrays
+    years = [year for year, _ in valid_results]
+    data_arrays = [data for _, data in valid_results]
+    
+    logger.info(f"Processing years: {sorted(years)} (total: {len(years)} years)")
+    
+    if len(years) < period_length:
+        logger.warning(f"Only found {len(years)} years of data for {period_length}-year period")
+        missing_years = set(range(start_year, end_year + 1)) - set(years)
+        logger.warning(f"Missing years: {sorted(missing_years)}")
+    
+    # Compute climate normal efficiently (returns lazy array)
+    climate_avg = compute_climate_normal_efficiently(data_arrays, years, target_year)
+    
+    # Apply unit conversions (still lazy)
+    if variable_name in ['tas', 'tasmax', 'tasmin']:
+        # Convert from Kelvin to Celsius
+        climate_avg = climate_avg - 273.15
+        climate_avg.attrs['units'] = 'degC'
+    elif variable_name == 'pr':
+        # Convert from kg m^-2 s^-1 to mm/day
+        climate_avg = climate_avg * 86400
+        climate_avg.attrs['units'] = 'mm/day'
+    
+    return climate_avg  # Return lazy array
+
+def convert_longitudes_to_standard(ds: xr.Dataset) -> xr.Dataset:
     """
     Convert longitudes from 0-360 format to standard -180 to 180 format.
     
@@ -551,7 +585,7 @@ def convert_longitudes_to_standard(ds):
     
     # Check if longitude coordinate exists
     if 'lon' not in ds_converted.coords:
-        print("Warning: 'lon' coordinate not found, skipping longitude conversion")
+        logger.warning("'lon' coordinate not found, skipping longitude conversion")
         return ds_converted
     
     # Convert longitudes that are > 180 to negative values (0-360 → -180 to 180)
@@ -566,126 +600,356 @@ def convert_longitudes_to_standard(ds):
     
     return ds_converted
 
-def main():
-    """Main processing function."""
-    start_time = datetime.now()
-    print(f"Starting climate data processing at {start_time}")
-    print(f"Processing scenario: {ACTIVE_SCENARIO}")
+def save_region_dataset_optimized(region_key: str, dataset: xr.Dataset, scenario: str) -> str:
+    """Save region dataset with optimized I/O and proper formatting."""
+    region_name = REGION_BOUNDS[region_key]['name'].lower().replace(' ', '_')
     
-    # Validate external drive path before proceeding
-    if not validate_external_drive():
-        print("Exiting due to path validation errors.")
+    # Include scenario in output filename with descriptive naming
+    if scenario == 'historical':
+        output_file = os.path.join(OUTPUT_DIR, f'{region_name}_{scenario}_climate_means_2012-2014.nc')
+    else:
+        output_file = os.path.join(OUTPUT_DIR, f'{region_name}_{scenario}_climate_means_2015-2100.nc')
+    
+    logger.info(f"Preparing to save {region_name} data to {output_file}...")
+    
+    # Convert longitudes if specified in the region settings
+    if REGION_BOUNDS[region_key].get('convert_longitudes', False):
+        logger.info(f"Converting longitudes for {region_name} from 0-360 to -180 to 180 format...")
+        dataset = convert_longitudes_to_standard(dataset)
+    
+    # Add global attributes to the dataset
+    dataset.attrs.update({
+        'title': f'Climate Means for {REGION_BOUNDS[region_key]["name"]}',
+        'scenario': scenario,
+        'methodology': 'Annual climate means',
+        'temporal_coverage': '2012-2014' if scenario == 'historical' else '2015-2100',
+        'spatial_coverage': REGION_BOUNDS[region_key]['name'],
+        'created': datetime.now().isoformat(),
+        'description': 'Annual climate measures based on available years.',
+        'variables': 'pr (precipitation), tas (temperature), tasmax (max temperature), tasmin (min temperature)',
+        'units_precipitation': 'mm/day',
+        'units_temperature': 'degC'
+    })
+    
+    # Optimize encoding for NetCDF output
+    encoding = {}
+    for var in dataset.data_vars:
+        encoding[var] = {
+            'zlib': True,          # Enable compression
+            'complevel': 4,        # Moderate compression level
+            'shuffle': True,       # Enable shuffle filter
+            'chunksizes': None,    # Let xarray determine optimal chunks for storage
+            'fletcher32': False,   # Disable checksum for speed
+        }
+    
+    # Save the dataset with optimized settings
+    logger.info(f"Computing and saving {region_name} data...")
+    log_memory_usage("before saving")
+    
+    dataset.to_netcdf(
+        output_file,
+        encoding=encoding,
+        format='NETCDF4',
+        engine='netcdf4'
+    )
+    
+    log_memory_usage("after saving")
+    logger.info(f"✓ Saved {region_name} data to {output_file}")
+    logger.info(f"  Variables: {list(dataset.data_vars.keys())}")
+    
+    # Get the count of variables for each type
+    var_counts = {}
+    for var_name in dataset.data_vars.keys():
+        var_type = var_name.split('_')[0]  # Extract variable type (e.g., 'pr', 'tas')
+        var_counts[var_type] = var_counts.get(var_type, 0) + 1
+    
+    logger.info(f"  Variable counts: {var_counts}")
+    
+    return output_file
+
+def main():
+    """Main processing function with optimized Dask implementation."""
+    start_time = datetime.now()
+    logger.info(f"Starting enhanced climate data processing at {start_time}")
+    log_memory_usage("startup")
+    
+    # Initialize file handler
+    file_handler = create_file_handler(
+        external_drive_path=EXTERNAL_DRIVE_PATH,
+        variables=VARIABLES,
+        scenarios=[ACTIVE_SCENARIO]  # Only process active scenario
+    )
+    
+    # Validate file paths
+    if not file_handler.validate_base_path():
+        logger.error("File path validation failed. Please check your configuration.")
+        logger.info(file_handler.get_expected_file_structure_info())
         return
     
-    # Generate climate periods for the active scenario
-    global CLIMATE_PERIODS
-    CLIMATE_PERIODS = generate_climate_periods(ACTIVE_SCENARIO)
-    print(f"Generated {len(CLIMATE_PERIODS)} climate periods for {ACTIVE_SCENARIO}")
-    if len(CLIMATE_PERIODS) > 0:
-        first_period = CLIMATE_PERIODS[0]
-        last_period = CLIMATE_PERIODS[-1]
-        print(f"  First period: {first_period[3]} (target: {first_period[2]}, window: {first_period[0]}-{first_period[1]})")
-        print(f"  Last period: {last_period[3]} (target: {last_period[2]}, window: {last_period[0]}-{last_period[1]})")
+    # Discover available files
+    logger.info("Discovering available files...")
+    available_files = file_handler.discover_available_files()
+    log_memory_usage("after file discovery")
     
-    # Initialize dask client for distributed computing
-    cluster = LocalCluster(n_workers=MAX_PROCESSES, memory_limit=MEMORY_LIMIT)
-    client = Client(cluster)
-    print(f"Dask dashboard available at: {client.dashboard_link}")
+    # Set up optimized dask distributed client
+    client, cluster = setup_dask_client()
+    log_memory_usage("after Dask setup")
     
     try:
-        # Initialize datasets for each region
-        region_datasets = {}
+        scenario = ACTIVE_SCENARIO
+        logger.info(f"Processing scenario: {scenario}")
         
-        # Get the file patterns for the active scenario
-        scenario_patterns = SCENARIOS[ACTIVE_SCENARIO]
+        # Data availability from file handler
+        data_availability = file_handler._data_availability
         
-        # Process each variable
-        for var_name, file_pattern in scenario_patterns.items():
-            print(f"\nProcessing {var_name} data...")
+        # Generate climate periods for the active scenario
+        climate_periods = generate_climate_periods(scenario, data_availability)
+        
+        if not climate_periods:
+            logger.error(f"No climate periods generated for scenario {scenario}")
+            return
+        
+        # Get available variables for this scenario
+        available_vars = list(available_files.get(scenario, {}).keys())
+        processing_vars = [var for var in VARIABLES if var in available_vars]
+        
+        if not processing_vars:
+            logger.error(f"No variables available for processing in scenario {scenario}")
+            logger.info(f"Available variables: {available_vars}")
+            return
+        
+        logger.info(f"Processing variables: {processing_vars}")
+        
+        # Collect all lazy computations organized by region
+        region_lazy_datasets = {}
+        computation_tasks = []
+        
+        logger.info("Creating lazy computation graph...")
+        log_memory_usage("before creating computation graph")
+        
+        # Process each variable and period to build lazy computation graph
+        for var_name in processing_vars:
+            logger.info(f"Setting up lazy computations for {var_name}...")
             
             # Process each climate period
-            for period in CLIMATE_PERIODS:
+            for period in climate_periods:
                 start_year, end_year, target_year, period_name = period
                 
                 # Process each region
                 for region_key in REGION_BOUNDS.keys():
                     region_name = REGION_BOUNDS[region_key]['name']
                     
-                    # Calculate climate average for this period, variable, and region
-                    climate_avg = process_period_region(period, var_name, file_pattern, region_key)
+                    # Create lazy computation for this combination
+                    lazy_result = dask.delayed(process_period_region_optimized)(
+                        period, var_name, file_handler, region_key
+                    )
                     
-                    if climate_avg is not None:
-                        # --- UNIT CONVERSIONS ---
-                        if var_name in ['tas', 'tasmax', 'tasmin']:
-                            # Convert from Kelvin to Celsius - maintain lazy evaluation
-                            climate_avg = climate_avg - 273.15
-                            climate_avg.attrs['units'] = 'degC'
-                        elif var_name == 'pr':
-                            # Convert from kg m^-2 s^-1 to mm/day - maintain lazy evaluation
-                            climate_avg = climate_avg * 86400
-                            climate_avg.attrs['units'] = 'mm/day'
-                        # ------------------------
-                        # Initialize dataset for this region if it doesn't exist
-                        if region_key not in region_datasets:
-                            region_datasets[region_key] = xr.Dataset()
-                        
-                        # Add to region dataset
-                        var_id = f"{var_name}_{target_year}"
-                        region_datasets[region_key][var_id] = climate_avg
-                        print(f"Added {var_name} for target year {target_year} in {region_name} to output dataset")
+                    # Store the task for batch computation
+                    task_key = f"{region_key}_{var_name}_{target_year}"
+                    computation_tasks.append((task_key, lazy_result))
+                    
+                    # Initialize region dataset collection if needed
+                    if region_key not in region_lazy_datasets:
+                        region_lazy_datasets[region_key] = {}
         
-        # Save separate files for each region
-        for region_key, ds in region_datasets.items():
-            region_name = REGION_BOUNDS[region_key]['name'].lower().replace(' ', '_')
+        logger.info(f"Created {len(computation_tasks)} lazy computation tasks")
+        log_memory_usage("after creating computation graph")
+        
+        # Compute all tasks in batches to manage memory
+        batch_size = min(BATCH_SIZE, len(computation_tasks))  # Use configured batch size
+        logger.info(f"Computing tasks in batches of {batch_size}...")
+        
+        total_batches = (len(computation_tasks) + batch_size - 1) // batch_size
+        
+        # Use tqdm for progress tracking
+        for i in tqdm(range(0, len(computation_tasks), batch_size), 
+                     desc="Processing batches", 
+                     total=total_batches):
+            batch = computation_tasks[i:i + batch_size]
+            batch_keys = [key for key, _ in batch]
+            batch_tasks = [task for _, task in batch]
             
-            # Include scenario in output filename with descriptive naming
-            if ACTIVE_SCENARIO == 'historical':
-                output_file = os.path.join(OUTPUT_DIR, f'{region_name}_{ACTIVE_SCENARIO}_30yr_climate_normals_1980-2014.nc')
+            current_batch = i // batch_size + 1
+            logger.info(f"Computing batch {current_batch}/{total_batches}")
+            logger.info(f"Batch contains tasks: {batch_keys[:3]}{'...' if len(batch_keys) > 3 else ''}")
+            
+            log_memory_usage(f"before batch {current_batch}")
+            
+            # Compute this batch
+            batch_results = dask.compute(*batch_tasks)
+            
+            log_memory_usage(f"after computing batch {current_batch}")
+            
+            # Organize results by region
+            for (task_key, _), result in zip(batch, batch_results):
+                if result is not None:
+                    region_key, var_name, target_year = task_key.split('_', 2)
+                    
+                    if region_key not in region_lazy_datasets:
+                        region_lazy_datasets[region_key] = {}
+                    
+                    var_id = f"{var_name}_{target_year}"
+                    region_lazy_datasets[region_key][var_id] = result
+                    
+                    logger.debug(f"Added {var_name} for target year {target_year} in {REGION_BOUNDS[region_key]['name']}")
+            
+            # Trigger garbage collection between batches
+            gc.collect()
+            log_memory_usage(f"after cleanup batch {current_batch}")
+        
+        # Convert collections to xarray Datasets and save
+        logger.info("Creating final datasets and saving...")
+        log_memory_usage("before creating final datasets")
+        
+        saved_files = []
+        for region_key, var_dict in region_lazy_datasets.items():
+            if var_dict:  # Only process regions with data
+                region_name = REGION_BOUNDS[region_key]['name']
+                logger.info(f"Creating dataset for {region_name} with {len(var_dict)} variables")
+                
+                log_memory_usage(f"before creating {region_name} dataset")
+                
+                # Create xarray Dataset
+                region_dataset = xr.Dataset(var_dict)
+                
+                # Save with optimized I/O
+                output_file = save_region_dataset_optimized(region_key, region_dataset, scenario)
+                saved_files.append(output_file)
+                
+                # Clean up memory
+                del region_dataset
+                gc.collect()
+                log_memory_usage(f"after saving {region_name}")
             else:
-                output_file = os.path.join(OUTPUT_DIR, f'{region_name}_{ACTIVE_SCENARIO}_30yr_climate_normals_2015-2100.nc')
-            
-            # Convert longitudes if specified in the region settings
-            if REGION_BOUNDS[region_key].get('convert_longitudes', False):
-                print(f"Converting longitudes for {region_name} from 0-360 to -180 to 180 format...")
-                ds = convert_longitudes_to_standard(ds)
-            
-            # Add global attributes to the dataset
-            ds.attrs.update({
-                'title': f'30-year Climate Normals for {REGION_BOUNDS[region_key]["name"]}',
-                'scenario': ACTIVE_SCENARIO,
-                'methodology': '30-year moving window climate normals',
-                'temporal_coverage': '1980-2014' if ACTIVE_SCENARIO == 'historical' else '2015-2100',
-                'spatial_coverage': REGION_BOUNDS[region_key]['name'],
-                'created': datetime.now().isoformat(),
-                'description': 'Annual climate measures based on 30-year moving windows. Each year represents the climate normal based on the preceding 30 years.',
-                'variables': 'tas (mean temperature), tasmax (maximum temperature), tasmin (minimum temperature), pr (precipitation)',
-                'units_temperature': 'degrees Celsius',
-                'units_precipitation': 'mm/day'
-            })
-            
-            # Save the dataset - trigger computation
-            print(f"Computing and saving {region_name} data...")
-            ds = ds.compute()  # Explicitly compute before saving
-            ds.to_netcdf(output_file)
-            print(f"Saved {region_name} data to {output_file}")
-            print(f"  Variables: {list(ds.data_vars.keys())}")
-            print(f"  Time range: {len([v for v in ds.data_vars.keys() if v.startswith('tas_')])} annual climate measures")
+                logger.warning(f"No data collected for region {REGION_BOUNDS[region_key]['name']}")
         
+        # Final summary
         end_time = datetime.now()
         runtime = end_time - start_time
-        print(f"\nProcessing complete!")
-        print(f"Total runtime: {runtime}")
+        logger.info(f"Processing complete!")
+        logger.info(f"Total runtime: {runtime}")
+        logger.info(f"Saved {len(saved_files)} output files:")
+        for file_path in saved_files:
+            logger.info(f"  {file_path}")
         
-        # Output data summary
-        print("\nOutput datasets summary:")
-        for region_key, ds in region_datasets.items():
-            print(f"\n{REGION_BOUNDS[region_key]['name']}:")
-            print(ds)
-            
+        # Display final memory and performance statistics
+        log_memory_usage("final")
+        logger.info(f"Peak memory usage: {psutil.Process().memory_info().rss / 1024**3:.2f} GB")
+        
+        # Calculate processing rate
+        total_tasks = len(computation_tasks)
+        tasks_per_minute = total_tasks / (runtime.total_seconds() / 60)
+        logger.info(f"Processing rate: {tasks_per_minute:.1f} tasks/minute")
+        
+    except Exception as e:
+        logger.error(f"Error during processing: {e}", exc_info=True)
+        log_memory_usage("error state")
+        raise
+    
     finally:
-        # Clean up dask client and cluster
-        client.close()
-        cluster.close()
+        # Comprehensive cleanup
+        logger.info("Cleaning up Dask resources...")
+        
+        try:
+            # Clear any remaining computations
+            client.restart()
+            client.close()
+            cluster.close()
+        except Exception as e:
+            logger.warning(f"Error during cleanup: {e}")
+        
+        # Final memory cleanup
+        gc.collect()
+        log_memory_usage("after cleanup")
+        
+        final_time = datetime.now()
+        total_runtime = final_time - start_time
+        logger.info(f"Total runtime including cleanup: {total_runtime}")
+
+def run_diagnostics():
+    """Run system diagnostics and configuration validation."""
+    logger.info("=== System Diagnostics ===")
+    
+    # System information
+    logger.info(f"Platform: {platform.system()} {platform.release()}")
+    logger.info(f"Python version: {platform.python_version()}")
+    
+    # Memory information
+    memory = psutil.virtual_memory()
+    logger.info(f"Total memory: {memory.total / 1024**3:.1f} GB")
+    logger.info(f"Available memory: {memory.available / 1024**3:.1f} GB")
+    logger.info(f"Memory usage: {memory.percent:.1f}%")
+    
+    # CPU information
+    logger.info(f"CPU cores: {mp.cpu_count()}")
+    logger.info(f"CPU usage: {psutil.cpu_percent(interval=1):.1f}%")
+    
+    # Disk space
+    disk = psutil.disk_usage(OUTPUT_DIR)
+    logger.info(f"Output directory: {OUTPUT_DIR}")
+    logger.info(f"Disk space available: {disk.free / 1024**3:.1f} GB")
+    
+    # Configuration
+    logger.info("=== Configuration ===")
+    logger.info(f"External drive path: {EXTERNAL_DRIVE_PATH}")
+    logger.info(f"Active scenario: {ACTIVE_SCENARIO}")
+    logger.info(f"Variables: {VARIABLES}")
+    logger.info(f"Parallel processing: {PARALLEL_PROCESSING}")
+    logger.info(f"Batch size: {BATCH_SIZE}")
+    logger.info(f"Max workers: {MAX_WORKERS}")
+    
+    # File handler validation
+    logger.info("=== File Handler Validation ===")
+    try:
+        file_handler = create_file_handler(
+            external_drive_path=EXTERNAL_DRIVE_PATH,
+            variables=VARIABLES,
+            scenarios=[ACTIVE_SCENARIO]
+        )
+        
+        if file_handler.validate_base_path():
+            logger.info("✓ Base path validation passed")
+            
+            # Quick file discovery
+            available_files = file_handler.discover_available_files()
+            for scenario, vars_dict in available_files.items():
+                for var, file_list in vars_dict.items():
+                    if file_list:
+                        years = [year for year, _ in file_list]
+                        logger.info(f"✓ {scenario}/{var}: {len(file_list)} files ({min(years)}-{max(years)})")
+                    else:
+                        logger.warning(f"✗ {scenario}/{var}: No files found")
+        else:
+            logger.error("✗ Base path validation failed")
+            
+    except Exception as e:
+        logger.error(f"File handler validation failed: {e}")
 
 if __name__ == "__main__":
-    main()
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Enhanced Climate Data Processor')
+    parser.add_argument('--diagnostics', action='store_true', 
+                       help='Run system diagnostics only')
+    parser.add_argument('--config', type=str, 
+                       help='Path to configuration file')
+    parser.add_argument('--scenario', type=str, 
+                       help='Override active scenario')
+    parser.add_argument('--variables', type=str, 
+                       help='Comma-separated list of variables to process')
+    
+    args = parser.parse_args()
+    
+    # Then override configuration with command line arguments
+    if args.scenario:
+        ACTIVE_SCENARIO = args.scenario
+        logger.info(f"Scenario overridden to: {ACTIVE_SCENARIO}")
+    
+    if args.variables:
+        VARIABLES = [v.strip() for v in args.variables.split(',')]
+        logger.info(f"Variables overridden to: {VARIABLES}")
+    
+    if args.diagnostics:
+        run_diagnostics()
+    else:
+        main()

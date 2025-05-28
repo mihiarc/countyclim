@@ -1,0 +1,291 @@
+2025-05-28 09:45:34,337 - __main__ - INFO - Starting enhanced climate data processing at 2025-05-28 09:45:34.336999
+2025-05-28 09:45:34,337 - __main__ - INFO - Memory usage startup: 138.5 MB (0.14 GB)
+2025-05-28 09:45:34,337 - file_path_handler - INFO - ✓ Base data path validated: /media/mihiarc/RPA1TB/data/NorESM2-LM
+2025-05-28 09:45:34,337 - __main__ - INFO - Discovering available files...
+2025-05-28 09:45:34,337 - file_path_handler - INFO - Discovered 65 files for tas historical: 1950-2014
+2025-05-28 09:45:34,338 - file_path_handler - INFO - Discovered 65 files for tasmax historical: 1950-2014
+2025-05-28 09:45:34,338 - file_path_handler - INFO - Discovered 65 files for tasmin historical: 1950-2014
+2025-05-28 09:45:34,339 - file_path_handler - INFO - Discovered 65 files for pr historical: 1950-2014
+2025-05-28 09:45:34,339 - __main__ - INFO - Memory usage after file discovery: 138.9 MB (0.14 GB)
+2025-05-28 09:45:34,339 - __main__ - INFO - Initializing optimized Dask distributed computing...
+2025-05-28 09:45:34,339 - __main__ - INFO - System memory - Total: 92.9GB, Available: 87.3GB
+2025-05-28 09:45:34,339 - __main__ - INFO - Dask configuration: {'n_workers': 4, 'memory_limit': '4GB', 'threads_per_worker': 2}
+2025-05-28 09:45:35,375 - __main__ - INFO - Dask dashboard available at: http://127.0.0.1:8787/status
+2025-05-28 09:45:35,376 - __main__ - INFO - Cluster info: LocalCluster(93c03c8c, 'tcp://127.0.0.1:36259', workers=4, threads=8, memory=14.90 GiB)
+2025-05-28 09:45:35,376 - __main__ - INFO - Memory usage after Dask setup: 160.4 MB (0.16 GB)
+2025-05-28 09:45:35,376 - __main__ - INFO - Processing scenario: historical
+2025-05-28 09:45:35,376 - __main__ - INFO - Generated 35 periods for historical:
+2025-05-28 09:45:35,377 - __main__ - INFO - First period: 1951-1980 (target: 1980)
+2025-05-28 09:45:35,377 - __main__ - INFO - Last period: 1985-2014 (target: 2014)
+2025-05-28 09:45:35,377 - __main__ - INFO - Processing variables: ['tas', 'tasmax', 'tasmin', 'pr']
+2025-05-28 09:45:35,377 - __main__ - INFO - Creating lazy computation graph...
+2025-05-28 09:45:35,377 - __main__ - INFO - Memory usage before creating computation graph: 160.4 MB (0.16 GB)
+2025-05-28 09:45:35,377 - __main__ - INFO - Setting up lazy computations for tas...
+2025-05-28 09:45:35,393 - __main__ - INFO - Setting up lazy computations for tasmax...
+2025-05-28 09:45:35,402 - __main__ - INFO - Setting up lazy computations for tasmin...
+2025-05-28 09:45:35,462 - __main__ - INFO - Setting up lazy computations for pr...
+2025-05-28 09:45:35,472 - __main__ - INFO - Created 700 lazy computation tasks
+2025-05-28 09:45:35,472 - __main__ - INFO - Memory usage after creating computation graph: 161.2 MB (0.16 GB)
+2025-05-28 09:45:35,472 - __main__ - INFO - Computing tasks in batches of 20...
+2025-05-28 09:45:35,478 - __main__ - INFO - Computing batch 1/35
+2025-05-28 09:45:35,478 - __main__ - INFO - Batch contains tasks: ['CONUS_tas_1980', 'AK_tas_1980', 'HI_tas_1980']...
+2025-05-28 09:45:35,478 - __main__ - INFO - Memory usage before batch 1: 161.2 MB (0.16 GB)
+2025-05-28 09:45:35,504 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:35,505 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:35,505 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:35,505 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:35,506 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:35,506 - __main__ - INFO - Region: Alaska
+2025-05-28 09:45:35,508 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:35,508 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,510 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:35,511 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:35,511 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:35,511 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:35,512 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,512 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:35,512 - __main__ - INFO - Region: Puerto Rico and U.S. Virgin Islands
+2025-05-28 09:45:35,513 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:35,514 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:35,514 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,515 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,516 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:35,516 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:35,516 - __main__ - INFO - Region: Alaska
+2025-05-28 09:45:35,517 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:35,518 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:35,518 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,518 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,518 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:35,519 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:35,520 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,520 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:35,520 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,521 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:35,521 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:35,522 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:35,522 - __main__ - INFO - Region: Puerto Rico and U.S. Virgin Islands
+2025-05-28 09:45:35,522 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,522 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:35,522 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:35,522 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:35,524 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:35,524 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:35,524 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,524 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,527 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,527 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:35,527 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,528 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:35,529 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:35,529 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:35,527 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,529 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,529 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,530 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,531 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,532 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:35,533 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:35,533 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:35,536 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:35,536 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,538 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,540 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:35,541 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:35,542 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:35,542 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:35,543 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:35,543 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:35,544 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:35,544 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,545 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:35,546 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,548 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,549 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,550 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:35,550 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:35,551 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:35,551 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:35,551 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,551 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:35,551 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:35,552 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:35,552 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:35,552 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,553 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,554 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,556 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:35,558 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:35,561 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:35,562 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:35,562 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:35,563 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:35,563 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,565 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:35,566 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:35,567 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:35,567 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:35,568 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:36,992 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:36,993 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:36,993 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:36,993 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:36,993 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:36,994 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:36,994 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:36,995 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:36,998 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,001 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:37,001 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:37,002 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,002 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:37,002 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:37,002 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:37,002 - __main__ - INFO - Region: Puerto Rico and U.S. Virgin Islands
+2025-05-28 09:45:37,002 - __main__ - INFO - Region: Alaska
+2025-05-28 09:45:37,003 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:37,003 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,004 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:37,004 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,006 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,006 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,009 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,010 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:37,010 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:37,010 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:37,011 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:37,011 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:37,011 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:37,012 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:37,012 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,015 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,016 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:37,016 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:37,016 - __main__ - INFO - Region: Alaska
+2025-05-28 09:45:37,017 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:37,017 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,018 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:37,018 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,018 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:37,019 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:37,019 - __main__ - INFO - Region: Puerto Rico and U.S. Virgin Islands
+2025-05-28 09:45:37,019 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,020 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:37,020 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,021 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,022 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,027 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:37,030 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:37,030 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:37,030 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:37,031 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:37,031 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,032 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:37,033 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,033 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:37,033 - __main__ - INFO - Processing tas for historical_1981
+2025-05-28 09:45:37,033 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:37,033 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:37,033 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:37,033 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:37,033 - __main__ - INFO - 30-year period: 1952-1981 (target: 1981)
+2025-05-28 09:45:37,034 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:37,034 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,034 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:37,034 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:37,034 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:37,035 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:37,035 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,035 - file_path_handler - INFO - Found 30 files for tas historical in years 1952-1981
+2025-05-28 09:45:37,035 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,036 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,037 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,037 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,038 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:37,038 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,041 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,041 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:37,041 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:37,041 - __main__ - INFO - Region: Hawaii and Islands
+2025-05-28 09:45:37,042 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:37,042 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,044 - __main__ - INFO - Processing tas for historical_1983
+2025-05-28 09:45:37,044 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,045 - __main__ - INFO - 30-year period: 1954-1983 (target: 1983)
+2025-05-28 09:45:37,045 - __main__ - INFO - Region: Puerto Rico and U.S. Virgin Islands
+2025-05-28 09:45:37,045 - file_path_handler - INFO - Found 30 files for tas historical in years 1954-1983
+2025-05-28 09:45:37,045 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,046 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:37,046 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:37,046 - __main__ - INFO - Region: CONUS
+2025-05-28 09:45:37,047 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,047 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:37,047 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,049 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,052 - __main__ - INFO - Processing tas for historical_1982
+2025-05-28 09:45:37,052 - __main__ - INFO - 30-year period: 1953-1982 (target: 1982)
+2025-05-28 09:45:37,053 - __main__ - INFO - Region: Guam and Northern Mariana Islands
+2025-05-28 09:45:37,054 - file_path_handler - INFO - Found 30 files for tas historical in years 1953-1982
+2025-05-28 09:45:37,054 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,055 - __main__ - INFO - Processing tas for historical_1980
+2025-05-28 09:45:37,055 - __main__ - INFO - 30-year period: 1951-1980 (target: 1980)
+2025-05-28 09:45:37,056 - __main__ - INFO - Region: Alaska
+2025-05-28 09:45:37,056 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,056 - file_path_handler - INFO - Found 30 files for tas historical in years 1951-1980
+2025-05-28 09:45:37,056 - __main__ - INFO - Creating delayed tasks for 30 files...
+2025-05-28 09:45:37,058 - __main__ - INFO - Computing file processing tasks...
+2025-05-28 09:45:37,148 - __main__ - ERROR - Error processing /media/mihiarc/RPA1TB/data/NorESM2-LM/tas/historical/tas_day_NorESM2-LM_historical_r1i1p1f1_gn_1978.nc for region AK: NetCDF4BackendEntrypoint.open_dataset() got an unexpected keyword argument 'parallel'
+2025-05-28 09:45:37,149 - __main__ - ERROR - Error processing /media/mihiarc/RPA1TB/data/NorESM2-LM/tas/historical/tas_day_NorESM2-LM_historical_r1i1p1f1_gn_1978.nc for region CONUS: NetCDF4BackendEntrypoint.open_dataset() got an unexpected keyword argument 'parallel'
+2025-05-28 09:45:37,166 - __main__ - ERROR - Error processing /media/mihiarc/RPA1TB/data/NorESM2-LM/tas/historical/tas_day_NorESM2-LM_historical_r1i1p1f1_gn_1959.nc for region AK: NetCDF4BackendEntrypoint.open_dataset() got an unexpected keyword argument 'parallel'
+2025-05-28 09:45:37,451 - __main__ - ERROR - Error processing /media/mihiarc/RPA1TB/data/NorESM2-LM/tas/historical/tas_day_NorESM2-LM_historical_r1i1p1f1_gn_1966.nc for region HI: NetCDF4BackendEntrypoint.open_dataset() got an unexpected keyword argument 'parallel'
+2025-05-28 09:45:37,535 - __main__ - ERROR - Error processing /media/mihiarc/RPA1TB/data/NorESM2-LM/tas/historical/tas_day_NorESM2-LM_historical_r1i1p1f1_gn_1952.nc for region HI: NetCDF4BackendEntrypoint.open_dataset() got an unexpected keyword argument 'parallel'
+2025-05-28 09:45:37,552 - __main__ - ERROR - Error processing /media/mihiarc/RPA1TB/data/NorESM2-LM/tas/historical/tas_day_NorESM2-LM_historical_r1i1p1f1_gn_1962.nc for region AK: NetCDF4BackendEntrypoint.open_dataset() got an unexpected keyword argument 'parallel'
+2025-05-28 09:45:37,708 - __main__ - ERROR - Error during processing: Attempted to run task 'process_period_region_optimized-e53037f9-724c-4390-84d7-e96401bc0075' on 4 different workers, but all those workers died while running it. The last worker that attempt to run the task was tcp://127.0.0.1:45695. Inspecting worker logs is often a good next step to diagnose what went wrong. For more information see https://distributed.dask.org/en/stable/killed.html.
+Traceback (most recent call last):
+  File "/home/mihiarc/repos/climate-county/climate_means.py", line 779, in main
+    batch_results = dask.compute(*batch_tasks)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mihiarc/repos/climate-county/.venv/lib/python3.12/site-packages/dask/base.py", line 681, in compute
+    results = schedule(expr, keys, **kwargs)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/mihiarc/repos/climate-county/.venv/lib/python3.12/site-packages/distributed/client.py", line 2409, in _gather
+    raise exception.with_traceback(traceback)
+distributed.scheduler.KilledWorker: Attempted to run task 'process_period_region_optimized-e53037f9-724c-4390-84d7-e96401bc0075' on 4 different workers, but all those workers died while running it. The last worker that attempt to run the task was tcp://127.0.0.1:45695. Inspecting worker logs is often a good next step to diagnose what went wrong. For more information see https://distributed.dask.org/en/stable/killed.html.
+2025-05-28 09:45:37,710 - __main__ - INFO - Memory usage error state: 164.7 MB (0.16 GB)
+2025-05-28 09:45:37,710 - __main__ - INFO - Cleaning up Dask resources...
+2025-05-28 09:45:38,593 - __main__ - INFO - Memory usage after cleanup: 165.2 MB (0.16 GB)
+2025-05-28 09:45:38,593 - __main__ - INFO - Total runtime including cleanup: 0:00:04.256858
+2025-05-28 12:00:22,542 - __main__ - INFO - === Climate Data Processor Starting ===
+2025-05-28 12:00:22,542 - __main__ - INFO - Configuration loaded from: climate_config.ini
+2025-05-28 12:00:22,542 - __main__ - INFO - Running system diagnostics...
+2025-05-28 12:00:22,542 - climate_processor.utils.diagnostics - INFO - === Climate Data Processor Diagnostics ===
+2025-05-28 12:00:22,542 - climate_processor.utils.diagnostics - INFO - === System Information ===
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - Platform: Linux 6.11.0-26-generic
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - Python version: 3.12.7
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - CPU cores: 56
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - Memory: 92.9 GB total, 86.7 GB available (6.8% used)
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - Disk .: 287.0 GB free of 467.3 GB
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - Disk /tmp: 287.0 GB free of 467.3 GB
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - Disk /: 287.0 GB free of 467.3 GB
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - === Configuration Summary ===
+External Drive: /media/mihiarc/RPA1TB/data/NorESM2-LM
+Output Directory: output/climate_means
+Active Scenario: historical
+Variables: tas, tasmax, tasmin, pr
+Parallel Processing: True
+Batch Size: 20
+Max Workers: 4
+Log Level: INFO
+File Validation: True
+Compression: True (level 4)
+==========================
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - === Dependency Check ===
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - ERROR - ✗ netcdf4 not available
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - ERROR - ✗ Missing dependencies: ['netcdf4']
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - ERROR - Please install missing packages: pip install -r requirements.txt
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - === Memory Recommendations ===
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - 💡 Excellent memory for climate processing
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - 💡 Can use larger batch_size (25-50)
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - === Performance Estimates ===
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - 🚀 Excellent performance expected
+2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - === Diagnostics Complete ===
