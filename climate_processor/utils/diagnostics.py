@@ -174,8 +174,8 @@ def check_dependencies() -> Dict[str, bool]:
             dependencies[package] = True
             logger.debug(f"✓ {package} available")
         except ImportError:
-            dependencies[package] = False
-            logger.error(f"✗ {package} not available")
+            dependencies[package_name] = False
+            logger.error(f"✗ {package_name} not available")
     
     return dependencies
 

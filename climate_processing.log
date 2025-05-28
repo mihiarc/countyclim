@@ -289,3 +289,81 @@ Compression: True (level 4)
 2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - === Performance Estimates ===
 2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - 🚀 Excellent performance expected
 2025-05-28 12:00:22,548 - climate_processor.utils.diagnostics - INFO - === Diagnostics Complete ===
+2025-05-28 12:01:17,487 - __main__ - INFO - === Climate Data Processor Starting ===
+2025-05-28 12:01:17,487 - __main__ - INFO - Configuration loaded from: climate_config.ini
+2025-05-28 12:01:17,487 - __main__ - INFO - Running system diagnostics...
+2025-05-28 12:01:17,487 - climate_processor.utils.diagnostics - INFO - === Climate Data Processor Diagnostics ===
+2025-05-28 12:01:17,487 - climate_processor.utils.diagnostics - INFO - === System Information ===
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - Platform: Linux 6.11.0-26-generic
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - Python version: 3.12.7
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - CPU cores: 56
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - Memory: 92.9 GB total, 86.7 GB available (6.8% used)
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - Disk .: 287.0 GB free of 467.3 GB
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - Disk /tmp: 287.0 GB free of 467.3 GB
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - Disk /: 287.0 GB free of 467.3 GB
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - === Configuration Summary ===
+External Drive: /media/mihiarc/RPA1TB/data/NorESM2-LM
+Output Directory: output/climate_means
+Active Scenario: historical
+Variables: tas, tasmax, tasmin, pr
+Parallel Processing: True
+Batch Size: 20
+Max Workers: 4
+Log Level: INFO
+File Validation: True
+Compression: True (level 4)
+==========================
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - INFO - === Dependency Check ===
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - ERROR - ✗ netcdf4 not available
+2025-05-28 12:01:17,493 - climate_processor.utils.diagnostics - ERROR - ✗ Missing dependencies: ['netcdf4']
+2025-05-28 12:01:17,494 - climate_processor.utils.diagnostics - ERROR - Please install missing packages: pip install -r requirements.txt
+2025-05-28 12:01:17,494 - climate_processor.utils.diagnostics - INFO - === Memory Recommendations ===
+2025-05-28 12:01:17,494 - climate_processor.utils.diagnostics - INFO - 💡 Excellent memory for climate processing
+2025-05-28 12:01:17,494 - climate_processor.utils.diagnostics - INFO - 💡 Can use larger batch_size (25-50)
+2025-05-28 12:01:17,494 - climate_processor.utils.diagnostics - INFO - === Performance Estimates ===
+2025-05-28 12:01:17,494 - climate_processor.utils.diagnostics - INFO - 🚀 Excellent performance expected
+2025-05-28 12:01:17,494 - climate_processor.utils.diagnostics - INFO - === Diagnostics Complete ===
+2025-05-28 12:02:51,184 - __main__ - INFO - === Climate Data Processor Starting ===
+2025-05-28 12:02:51,184 - __main__ - INFO - Configuration loaded from: climate_config.ini
+2025-05-28 12:02:51,184 - __main__ - INFO - Running system diagnostics...
+2025-05-28 12:02:51,184 - climate_processor.utils.diagnostics - INFO - === Climate Data Processor Diagnostics ===
+2025-05-28 12:02:51,184 - climate_processor.utils.diagnostics - INFO - === System Information ===
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - Platform: Linux 6.11.0-26-generic
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - Python version: 3.12.7
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - CPU cores: 56
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - Memory: 92.9 GB total, 86.7 GB available (6.7% used)
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - Disk .: 287.0 GB free of 467.3 GB
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - Disk /tmp: 287.0 GB free of 467.3 GB
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - Disk /: 287.0 GB free of 467.3 GB
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - === Configuration Summary ===
+External Drive: /media/mihiarc/RPA1TB/data/NorESM2-LM
+Output Directory: output/climate_means
+Active Scenario: historical
+Variables: tas, tasmax, tasmin, pr
+Parallel Processing: True
+Batch Size: 20
+Max Workers: 4
+Log Level: INFO
+File Validation: True
+Compression: True (level 4)
+==========================
+2025-05-28 12:02:51,190 - climate_processor.utils.diagnostics - INFO - === Dependency Check ===
+2025-05-28 12:02:51,196 - climate_processor.utils.diagnostics - INFO - ✓ All required dependencies available
+2025-05-28 12:02:51,197 - climate_processor.utils.diagnostics - INFO - === File Handler Validation ===
+2025-05-28 12:02:51,197 - climate_processor.climate_procesor.file_handler - INFO - ✓ Base path validation successful: /media/mihiarc/RPA1TB/data/NorESM2-LM
+2025-05-28 12:02:51,197 - climate_processor.utils.diagnostics - INFO - ✓ Base path validation passed
+2025-05-28 12:02:51,197 - climate_processor.climate_procesor.file_handler - INFO - Discovering available files...
+2025-05-28 12:02:51,198 - climate_processor.climate_procesor.file_handler - INFO - Found 65 files for tas historical: 1950-2014
+2025-05-28 12:02:51,198 - climate_processor.climate_procesor.file_handler - INFO - Found 65 files for tasmax historical: 1950-2014
+2025-05-28 12:02:51,198 - climate_processor.climate_procesor.file_handler - INFO - Found 65 files for tasmin historical: 1950-2014
+2025-05-28 12:02:51,199 - climate_processor.climate_procesor.file_handler - INFO - Found 65 files for pr historical: 1950-2014
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - ✓ historical/tas: 65 files (1950-2014)
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - ✓ historical/tasmax: 65 files (1950-2014)
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - ✓ historical/tasmin: 65 files (1950-2014)
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - ✓ historical/pr: 65 files (1950-2014)
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - === Memory Recommendations ===
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - 💡 Excellent memory for climate processing
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - 💡 Can use larger batch_size (25-50)
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - === Performance Estimates ===
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - 🚀 Excellent performance expected
+2025-05-28 12:02:51,199 - climate_processor.utils.diagnostics - INFO - === Diagnostics Complete ===
